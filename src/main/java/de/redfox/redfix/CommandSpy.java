@@ -45,6 +45,7 @@ public class CommandSpy implements Listener, CommandExecutor {
 				players.add(player.getUniqueId());
 				player.sendMessage("Enabled CommandSpy");
 			}
+			save();
 		}
 		return true;
 	}

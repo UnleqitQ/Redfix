@@ -20,6 +20,7 @@ public class RedfixPlugin extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		commandSpy = new CommandSpy();
+		commandSpy.load();
 		registerCommand("commandspy", commandSpy);
 	}
 	
