@@ -1,0 +1,10 @@
+name: Redfix
+version: '${project.version}'
+main: de.redfox.redfix.RedfixPlugin
+api-version: 1.18
+authors: [ Kevin, UnleqitQ ]
+
+commands:
+  commandspy:
+    description: spy on commands
+
