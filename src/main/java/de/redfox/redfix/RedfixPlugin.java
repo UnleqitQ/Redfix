@@ -10,7 +10,7 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	private static RedfixPlugin instance;
 	public CommandSpy commandSpy;
-	public static final String pluginPath = "plugins/Steckbrief";
+	public static final String pluginPath = "plugins/Redfix";
 	
 	public RedfixPlugin() {
 		instance = this;
