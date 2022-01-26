@@ -8,7 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerCommandSendEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -40,20 +40,15 @@ public class CommandSpy implements Listener, CommandExecutor {
 	}
 	
 	@EventHandler
-	public void onCommandSent(@NotNull PlayerCommandSendEvent event) {
-		String[] msgs = new String[event.getCommands().size()];
-		int i = 0;
-		for (String cmd : event.getCommands()) {
-			msgs[i++] = ChatColor.GRAY + "[CommandSpy] " + ChatColor.GREEN + event.getPlayer().getName() + ChatColor.WHITE + ": " + cmd;
-		}
+	public void onCommandSent(@NotNull PlayerCommandPreprocessEvent event) {
+		
+		String msg = ChatColor.GRAY + "[CommandSpy] " + ChatColor.GREEN + event.getPlayer().getName() + ChatColor.WHITE + ": " + event.getMessage();
 		for (UUID uuid : players) {
 			//if (event.getPlayer().getUniqueId().equals(uuid))
 			//	continue;
 			Player player = Bukkit.getPlayer(uuid);
 			if (player != null) {
-				for (String msg : msgs) {
-					player.sendMessage(msg);
-				}
+				player.sendMessage(msg);
 			}
 		}
 	}
