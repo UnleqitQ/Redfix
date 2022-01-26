@@ -44,8 +44,8 @@ public class CommandSpy implements Listener, CommandExecutor {
 		
 		String msg = ChatColor.GRAY + "[CommandSpy] " + ChatColor.GREEN + event.getPlayer().getName() + ChatColor.WHITE + ": " + event.getMessage();
 		for (UUID uuid : players) {
-			//if (event.getPlayer().getUniqueId().equals(uuid))
-			//	continue;
+			if (event.getPlayer().getUniqueId().equals(uuid))
+				continue;
 			Player player = Bukkit.getPlayer(uuid);
 			if (player != null) {
 				player.sendMessage(msg);
