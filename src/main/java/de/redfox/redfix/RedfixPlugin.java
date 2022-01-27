@@ -1,5 +1,8 @@
 package de.redfox.redfix;
 
+import de.redfox.redfix.commands.CommandSpy;
+import de.redfox.redfix.config.ConfigManager;
+import de.redfox.redfix.config.LinkedPath;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -19,12 +22,13 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	@Override
 	public void onEnable() {
+		ConfigManager.init();
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommand("commandspy", commandSpy);
 	}
 	
-	public <T extends CommandExecutor> void registerCommand(String cmd, T handler) {
+	public void registerCommand(String cmd, CommandExecutor handler) {
 		Objects.requireNonNull(getCommand(cmd)).setExecutor(handler);
 	}
 	

@@ -1,4 +1,4 @@
-package de.redfox.redfix;
+package de.redfox.redfix.commands;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -6,6 +6,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import de.redfox.redfix.RedfixPlugin;
+import de.redfox.redfix.config.ConfigManager;
+import de.redfox.redfix.config.LanguageConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -22,28 +25,53 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class CommandSpy implements Listener, CommandExecutor {
-	
+	private enum Messages {
+		PREFIX, COMMAND_DISABLE, COMMAND_ENABLE;
+
+		String val;
+
+		static String get(Messages... messages) {
+			StringBuilder ret = new StringBuilder();
+			for (Messages message : messages) {
+				ret.append(message.val);
+			}
+
+			return ret.toString();
+		}
+	}
+
+
 	public Set<UUID> players = new HashSet<>();
-	
+
 	public CommandSpy() {
+		LanguageConfig language = ConfigManager.language;
+		language.registerMessages(LanguageConfig.Locale.DE, Map.ofEntries(
+				Map.entry("prefix", "§cCommandSpy » "),
+				Map.entry("command_disable", "§7CommandSpy wurde §eaktiviert"),
+				Map.entry("command_enable", "§7CommandSpy wurde §edeaktiviert")
+		));
+
+		Messages.PREFIX.val = language.getMessage("prefix");
+		Messages.COMMAND_DISABLE.val = language.getMessage("command_disable");
+		Messages.COMMAND_ENABLE.val = language.getMessage("command_enable");
+
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
 	}
 	
 	@Override
 	public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-		if (commandSender instanceof Player) {
-			Player player = (Player) commandSender;
+		if (commandSender instanceof Player player) {
 			if (players.contains(player.getUniqueId())) {
 				players.remove(player.getUniqueId());
-				player.sendMessage("Disabled CommandSpy");
-			}
-			else {
+				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_DISABLE));
+			} else {
 				players.add(player.getUniqueId());
-				player.sendMessage("Enabled CommandSpy");
+				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_ENABLE));
 			}
 			save();
 		}
@@ -52,7 +80,7 @@ public class CommandSpy implements Listener, CommandExecutor {
 	
 	@EventHandler
 	public void onCommandSent(@NotNull PlayerCommandPreprocessEvent event) {
-		String msg = ChatColor.GRAY + "[CommandSpy] " + ChatColor.GREEN + event.getPlayer().getName() + ChatColor.WHITE + ": " + event.getMessage();
+		String msg = Messages.get(Messages.PREFIX) + "§e" + event.getPlayer().getName() + "§7: §f" + event.getMessage();
 		for (UUID uuid : players) {
 			if (event.getPlayer().getUniqueId().equals(uuid))
 				continue;
