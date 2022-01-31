@@ -1,9 +1,6 @@
 package de.redfox.redfix.commands;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import de.redfox.redfix.RedfixPlugin;
@@ -20,10 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -92,35 +85,24 @@ public class CommandSpy implements Listener, CommandExecutor {
 	}
 	
 	public void save() {
-		try {
-			File f = new File(RedfixPlugin.pluginPath, "commandspy.json");
-			if (!f.exists())
-				f.createNewFile();
-			JsonArray array = new JsonArray();
-			for (UUID uuid : players) {
-				array.add(uuid.toString());
-			}
-			JsonWriter writer = new JsonWriter(new FileWriter(f));
-			new Gson().toJson(array, writer);
-			writer.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		JsonArray array = new JsonArray();
+		for (UUID uuid : players)
+			array.add(uuid.toString());
+
+		ConfigManager.command_spy.set("players", array);
 	}
 	
 	public void load() {
-		try {
-			File f = new File(RedfixPlugin.pluginPath, "commandspy.json");
-			if (!f.exists())
-				return;
-			JsonReader reader = new JsonReader(new FileReader(f));
-			JsonArray array = JsonParser.parseReader(reader).getAsJsonArray();
-			for (JsonElement element : array) {
-				players.add(UUID.fromString(element.getAsString()));
+		JsonElement jsonElement = ConfigManager.command_spy.get("players");
+		if (jsonElement == null)
+			return;
+
+		for (JsonElement element : jsonElement.getAsJsonArray()) {
+			UUID uuid = UUID.fromString(element.getAsString());
+			if (Bukkit.getOnlinePlayers().stream()
+					.map(Player::getUniqueId).anyMatch(k -> k.equals(uuid))) {
+				players.add(uuid);
 			}
-			reader.close();
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 	

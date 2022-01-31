@@ -1,11 +1,8 @@
 package de.redfox.redfix.config;
 
-import com.google.common.collect.Maps;
 import com.google.gson.JsonPrimitive;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class LanguageConfig extends ConfigObject {
     public enum Locale {

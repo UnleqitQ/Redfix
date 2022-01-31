@@ -38,7 +38,6 @@ public class LinkedPath {
         }
 
         res.deleteCharAt(res.length() - 1);
-        System.getenv();
         return res.toString();
     }
 }
