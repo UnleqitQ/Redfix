@@ -8,6 +8,7 @@ import cloud.commandframework.execution.CommandExecutionCoordinator;
 import cloud.commandframework.paper.PaperCommandManager;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
+import de.redfox.redfix.modules.God;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -27,23 +28,25 @@ public class RedfixPlugin extends JavaPlugin {
 		instance = this;
 		new File(pluginPath).mkdirs();
 	}
-
-
-
+	
+	
 	private PaperCommandManager<CommandSender> manager;
 	Function<CommandTree<CommandSender>, CommandExecutionCoordinator<CommandSender>> executionCoordinatorFunction =
-					AsynchronousCommandExecutionCoordinator.<CommandSender>newBuilder().build();
+			AsynchronousCommandExecutionCoordinator.<CommandSender>newBuilder().build();
 	Function<CommandSender, CommandSender> mapperFunction = Function.identity();
-
+	
 	@Override
 	public void onEnable() {
 		ConfigManager.init();
+		
+		new God();
+		
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommand("commandspy", commandSpy);
 		registerCommands();
 	}
-
+	
 	private void registerCommands() {
 		try {
 			manager = new PaperCommandManager<>(this, executionCoordinatorFunction, mapperFunction, mapperFunction);
@@ -52,7 +55,7 @@ public class RedfixPlugin extends JavaPlugin {
 			this.getServer().getPluginManager().disablePlugin(this);
 			e.printStackTrace();
 		}
-
+		
 		Command.Builder<CommandSender> builder = this.manager.commandBuilder("jail");
 		builder = builder
 				.senderType(Player.class)
@@ -64,7 +67,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = commandContext.get("player");
 					player.sendMessage("Jailed XD");
 				});
-
+		
 		this.manager.command(builder);
 	}
 	
