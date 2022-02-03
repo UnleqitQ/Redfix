@@ -69,7 +69,7 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		builder = this.manager.commandBuilder("god");
 		builder = builder.senderType(Player.class)
-				.flag(CommandFlag.newBuilder("silent").build())
+				.flag(CommandFlag.newBuilder("silent").withAliases("s").build())
 				//.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
 					Player player = (Player) commandContext.getSender();
