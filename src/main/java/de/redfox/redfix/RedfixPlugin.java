@@ -47,13 +47,15 @@ public class RedfixPlugin extends JavaPlugin {
 	private void registerCommands() {
 		try {
 			manager = new PaperCommandManager<>(this, executionCoordinatorFunction, mapperFunction, mapperFunction);
+		} catch (Exception e) {
 			this.getLogger().severe("Failed to initialize the command this.manager");
 			this.getServer().getPluginManager().disablePlugin(this);
-		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
-		Command.Builder<CommandSender> builder = this.manager.commandBuilder("builder");
+		Command.Builder<CommandSender> builder = this.manager.commandBuilder("jail");
+
+
 		this.manager.command(builder.literal("jail")
 				.senderType(Player.class)
 				.argument(PlayerArgument.of("player"))
