@@ -113,6 +113,8 @@ public class RedfixPlugin extends JavaPlugin {
 					player.sendMessage(player.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 				});
 		this.manager.command(builder);
+		
+		//TODO: ptime, pweather, walkspeed, flyspeed, speed, distance, jail, weather, time
 	}
 	
 	public void registerCommand(String cmd, CommandExecutor handler) {
