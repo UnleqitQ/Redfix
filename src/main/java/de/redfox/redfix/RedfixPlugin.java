@@ -54,18 +54,18 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 
 		Command.Builder<CommandSender> builder = this.manager.commandBuilder("jail");
-
-
-		this.manager.command(builder.literal("jail")
+		builder = builder
 				.senderType(Player.class)
 				.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
 					CommandSender sender = commandContext.getSender();
-					sender.sendMessage("You jailed " + commandContext.getRawInput().get(0));
+					Player target = commandContext.get("player");
+					sender.sendMessage("You jailed " + target.getName());
 					Player player = commandContext.get("player");
 					player.sendMessage("Jailed XD");
-				})
-		);
+				});
+
+		this.manager.command(builder);
 	}
 	
 	public void registerCommand(String cmd, CommandExecutor handler) {
