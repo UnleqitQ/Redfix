@@ -97,6 +97,9 @@ public class ConfigObject {
 				read.append((char) res);
 			}
 			rootSection = JSONParser.parse(read.toString());
+
+			reader.close();
+			sbc.close();
 			
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -29,7 +29,8 @@ public class LanguageConfig extends ConfigObject {
     }
 
     public void registerMessages(Locale locale, Map<String, String> entries) {
-        entries.forEach((k, v) -> super.setDefault(locale.name + "." + v,  new JsonPrimitive(v)));
+        entries.forEach((k, v) -> super.setDefault(locale.name + "." + k,  new JsonPrimitive(v)));
+        super.save();
     }
 
     public String getMessage(Locale locale, LinkedPath path) {

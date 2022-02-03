@@ -11,4 +11,8 @@ public class ConfigManager {
         language = new LanguageConfig(pluginPath, "lang.json");
         command_spy = new ConfigObject(pluginPath, "command_spy.json");
     }
+
+    public static void finish() {
+        language.save();
+    }
 }
