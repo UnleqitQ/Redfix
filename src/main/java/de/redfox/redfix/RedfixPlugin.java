@@ -74,7 +74,7 @@ public class RedfixPlugin extends JavaPlugin {
 						ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
 						"s").build())
 				.flag(CommandFlag.newBuilder("notarget").withDescription(
-						ArgumentDescription.of("Mobs don't target you")).withAliases("nt").build())
+						ArgumentDescription.of("Mobs don't target you")).withAliases("t").build())
 				//.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
 					Player player = (Player) commandContext.getSender();
