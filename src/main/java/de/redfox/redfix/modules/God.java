@@ -55,7 +55,7 @@ public class God implements Listener {
 				event.setCancelled(true);
 				System.out.println(event.getAmount());
 				Player player = (Player) event.getEntity();
-				player.setRemainingAir(300);
+				player.setRemainingAir(player.getMaximumAir()-1);
 				//event.setAmount(20);
 			}
 	}
