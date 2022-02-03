@@ -78,7 +78,7 @@ public class RedfixPlugin extends JavaPlugin {
 						player.sendMessage("Disabled God");
 					}
 					else {
-						God.players.put(player.getUniqueId(), commandContext.contains("silent"));
+						God.players.put(player.getUniqueId(), commandContext.flags().contains("silent"));
 						player.sendMessage("Enabled God");
 					}
 				});
