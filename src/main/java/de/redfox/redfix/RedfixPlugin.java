@@ -100,7 +100,7 @@ public class RedfixPlugin extends JavaPlugin {
 							Attribute.GENERIC_MAX_HEALTH).getValue() + player.getAbsorptionAmount());
 					player.setExhaustion(0);
 					player.setSaturation(20);
-					player.setSaturatedRegenRate(20);
+					player.setFoodLevel(20);
 					player.sendMessage("You got healed");
 				});
 		this.manager.command(builder);
