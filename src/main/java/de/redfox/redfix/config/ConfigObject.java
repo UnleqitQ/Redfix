@@ -41,7 +41,7 @@ public class ConfigObject {
 			current = jsonElement;
 		}
 
-		return null;
+		return current;
 	}
 
 	private void set(String property, JsonElement value, boolean overwrite) {

@@ -17,7 +17,7 @@ public class LanguageConfig extends ConfigObject {
 
     public LanguageConfig(String path, String file) {
         super(path, file);
-        super.set("selected_lang", new JsonPrimitive(Locale.DE.name()));
+        super.setDefault("selected_lang", new JsonPrimitive(Locale.DE.name()));
     }
 
     public Locale getSelectedLanguage() {
