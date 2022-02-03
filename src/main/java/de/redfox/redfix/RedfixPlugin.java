@@ -1,5 +1,6 @@
 package de.redfox.redfix;
 
+import cloud.commandframework.ArgumentDescription;
 import cloud.commandframework.Command;
 import cloud.commandframework.CommandTree;
 import cloud.commandframework.arguments.flags.CommandFlag;
@@ -69,7 +70,11 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		builder = this.manager.commandBuilder("god");
 		builder = builder.senderType(Player.class)
-				.flag(CommandFlag.newBuilder("silent").withAliases("s").build())
+				.flag(CommandFlag.newBuilder("silent").withDescription(
+						ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
+						"s").build())
+				.flag(CommandFlag.newBuilder("notarget").withDescription(
+						ArgumentDescription.of("Mobs don't target you")).withAliases("nt").build())
 				//.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
 					Player player = (Player) commandContext.getSender();
@@ -78,7 +83,8 @@ public class RedfixPlugin extends JavaPlugin {
 						player.sendMessage("Disabled God");
 					}
 					else {
-						God.players.put(player.getUniqueId(), commandContext.flags().contains("silent"));
+						God.players.put(player.getUniqueId(), new Boolean[]{commandContext.flags().contains(
+								"silent"), commandContext.flags().contains("notarget")});
 						player.sendMessage("Enabled God");
 					}
 				});

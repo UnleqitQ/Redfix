@@ -15,7 +15,7 @@ import java.util.UUID;
 
 public class God implements Listener {
 	
-	public static Map<UUID, Boolean> players = new HashMap<>();
+	public static Map<UUID, Boolean[]> players = new HashMap<>();
 	
 	public God() {
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
@@ -25,7 +25,7 @@ public class God implements Listener {
 	public void onDamage(@NotNull EntityDamageEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.containsKey(event.getEntity().getUniqueId()))
-				if (players.get(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId())[0])
 					event.setDamage(0);
 				else
 					event.setCancelled(true);
@@ -35,7 +35,7 @@ public class God implements Listener {
 	public void onDamage(@NotNull EntityDamageByEntityEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.containsKey(event.getEntity().getUniqueId()))
-				if (players.get(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId())[0])
 					event.setDamage(0);
 				else
 					event.setCancelled(true);
@@ -46,7 +46,7 @@ public class God implements Listener {
 	public void onDamage(@NotNull EntityDamageByBlockEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.containsKey(event.getEntity().getUniqueId()))
-				if (players.get(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId())[0])
 					event.setDamage(0);
 				else
 					event.setCancelled(true);
@@ -67,6 +67,20 @@ public class God implements Listener {
 			if (players.containsKey(event.getEntity().getUniqueId())) {
 				event.setCancelled(true);
 			}
+	}
+	
+	@EventHandler
+	public void onTarget(@NotNull EntityTargetLivingEntityEvent event) {
+		if (event.getTarget().getType() == EntityType.PLAYER)
+			if (players.containsKey(event.getTarget().getUniqueId()) && players.get(event.getTarget().getUniqueId())[2])
+				event.setCancelled(true);
+	}
+	
+	@EventHandler
+	public void onTarget(@NotNull EntityTargetEvent event) {
+		if (event.getTarget().getType() == EntityType.PLAYER)
+			if (players.containsKey(event.getTarget().getUniqueId()) && players.get(event.getTarget().getUniqueId())[2])
+				event.setCancelled(true);
 	}
 	
 }
