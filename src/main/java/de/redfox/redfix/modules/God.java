@@ -24,29 +24,32 @@ public class God implements Listener {
 	public void onDamage(@NotNull EntityDamageEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId()))
-				event.setCancelled(true);
+				event.setDamage(0);
+		//event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onDamage(@NotNull EntityDamageByEntityEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId()))
-				event.setCancelled(true);
+				event.setDamage(0);
+		//event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onDamage(@NotNull EntityDamageByBlockEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId()))
-				event.setCancelled(true);
+				event.setDamage(0);
+		//event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onLooseAir(@NotNull EntityAirChangeEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId())) {
-				//event.setCancelled(true);
-				event.setAmount(20);
+				event.setCancelled(true);
+				//event.setAmount(20);
 			}
 	}
 	
