@@ -44,7 +44,7 @@
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
 
-                    <outputDirectory>C:/Users/lkev/Desktop/server/1.18.1/plugins</outputDirectory>
+                    <outputDirectory>C:/Users/quent.DESKTOP-L0VD1RP/Downloads/server/plugins</outputDirectory>
                 </configuration>
             </plugin>
         </plugins>
@@ -84,6 +84,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>cloud.commandframework</groupId>
+            <artifactId>cloud-annotations</artifactId>
+            <version>1.6.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
             <version>1.18.1-R0.1-SNAPSHOT</version>
@@ -93,7 +99,7 @@
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
             <version>RELEASE</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>
