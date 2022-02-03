@@ -31,8 +31,7 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	
 	private PaperCommandManager<CommandSender> manager;
-	Function<CommandTree<CommandSender>, CommandExecutionCoordinator<CommandSender>> executionCoordinatorFunction =
-			AsynchronousCommandExecutionCoordinator.<CommandSender>newBuilder().build();
+	Function<CommandTree<CommandSender>, CommandExecutionCoordinator<CommandSender>> executionCoordinatorFunction = AsynchronousCommandExecutionCoordinator.<CommandSender>newBuilder().build();
 	Function<CommandSender, CommandSender> mapperFunction = Function.identity();
 	
 	@Override
@@ -57,15 +56,25 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		Command.Builder<CommandSender> builder = this.manager.commandBuilder("jail");
-		builder = builder
-				.senderType(Player.class)
-				.argument(PlayerArgument.of("player"))
+		builder = builder.senderType(Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
+			CommandSender sender = commandContext.getSender();
+			Player target = commandContext.get("player");
+			sender.sendMessage("You jailed " + target.getName());
+			Player player = commandContext.get("player");
+			player.sendMessage("Jailed XD");
+		});
+		
+		this.manager.command(builder);
+		
+		builder = this.manager.commandBuilder("god");
+		builder = builder.senderType(Player.class)
+				//.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
-					CommandSender sender = commandContext.getSender();
-					Player target = commandContext.get("player");
-					sender.sendMessage("You jailed " + target.getName());
-					Player player = commandContext.get("player");
-					player.sendMessage("Jailed XD");
+					Player player = (Player) commandContext.getSender();
+					if (God.players.contains(player.getUniqueId()))
+						God.players.remove(player.getUniqueId());
+					else
+						God.players.add(player.getUniqueId());
 				});
 		
 		this.manager.command(builder);
