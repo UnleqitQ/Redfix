@@ -49,6 +49,7 @@ public class God implements Listener {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId())) {
 				event.setCancelled(true);
+				event.setAmount(200);
 				//event.setAmount(20);
 			}
 	}
