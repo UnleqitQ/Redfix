@@ -9,13 +9,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class God implements Listener {
 	
-	public static Set<UUID> players = new HashSet<>();
+	public static Map<UUID, Boolean> players = new HashMap<>();
 	
 	public God() {
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
@@ -24,31 +24,39 @@ public class God implements Listener {
 	@EventHandler
 	public void onDamage(@NotNull EntityDamageEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(event.getEntity().getUniqueId()))
-				event.setDamage(0);
-		//event.setCancelled(true);
+			if (players.containsKey(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId()))
+					event.setDamage(0);
+				else
+					event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onDamage(@NotNull EntityDamageByEntityEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(event.getEntity().getUniqueId()))
-				event.setDamage(0);
+			if (players.containsKey(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId()))
+					event.setDamage(0);
+				else
+					event.setCancelled(true);
 		//event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onDamage(@NotNull EntityDamageByBlockEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(event.getEntity().getUniqueId()))
-				event.setDamage(0);
+			if (players.containsKey(event.getEntity().getUniqueId()))
+				if (players.get(event.getEntity().getUniqueId()))
+					event.setDamage(0);
+				else
+					event.setCancelled(true);
 		//event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onLooseAir(@NotNull EntityAirChangeEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(
+			if (players.containsKey(
 					event.getEntity().getUniqueId()) && event.getAmount() < ((Player) event.getEntity()).getRemainingAir())
 				event.setCancelled(true);
 	}
@@ -56,7 +64,7 @@ public class God implements Listener {
 	@EventHandler
 	public void onExhaustion(@NotNull EntityExhaustionEvent event) {
 		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(event.getEntity().getUniqueId())) {
+			if (players.containsKey(event.getEntity().getUniqueId())) {
 				event.setCancelled(true);
 			}
 	}

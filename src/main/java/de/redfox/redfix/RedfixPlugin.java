@@ -2,6 +2,7 @@ package de.redfox.redfix;
 
 import cloud.commandframework.Command;
 import cloud.commandframework.CommandTree;
+import cloud.commandframework.arguments.flags.CommandFlag;
 import cloud.commandframework.bukkit.parsers.PlayerArgument;
 import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
 import cloud.commandframework.execution.CommandExecutionCoordinator;
@@ -68,13 +69,18 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		builder = this.manager.commandBuilder("god");
 		builder = builder.senderType(Player.class)
+				.flag(CommandFlag.newBuilder("silent").build())
 				//.argument(PlayerArgument.of("player"))
 				.handler(commandContext -> {
 					Player player = (Player) commandContext.getSender();
-					if (God.players.contains(player.getUniqueId()))
+					if (God.players.containsKey(player.getUniqueId())) {
 						God.players.remove(player.getUniqueId());
-					else
-						God.players.add(player.getUniqueId());
+						player.sendMessage("Disabled God");
+					}
+					else {
+						God.players.put(player.getUniqueId(), commandContext.contains("silent"));
+						player.sendMessage("Enabled God");
+					}
 				});
 		
 		this.manager.command(builder);
