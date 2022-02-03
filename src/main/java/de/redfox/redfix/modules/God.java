@@ -49,15 +49,16 @@ public class God implements Listener {
 	public void onLooseAir(@NotNull EntityAirChangeEvent event) {
 		System.out.println(event.getEntityType());
 		System.out.println(players);
-		if (event.getEntityType() == EntityType.PLAYER)
-			if (players.contains(event.getEntity().getUniqueId())) {
+		if (event.getEntityType() == EntityType.PLAYER) {
+			Player player = (Player) event.getEntity();
+			if (players.contains(event.getEntity().getUniqueId()) && event.getAmount() < player.getRemainingAir()) {
 				System.out.println("cancelled");
 				event.setCancelled(true);
 				System.out.println(event.getAmount());
-				Player player = (Player) event.getEntity();
-				player.setRemainingAir(player.getMaximumAir()-1);
+				player.setRemainingAir(player.getMaximumAir() - 1);
 				//event.setAmount(20);
 			}
+		}
 	}
 	
 	@EventHandler
