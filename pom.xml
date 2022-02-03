@@ -53,6 +53,25 @@
                     <target>16</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <id>make</id>
+                    </execution>
+                </executions>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+            </plugin>
         </plugins>
         <defaultGoal>clean package</defaultGoal>
         <sourceDirectory>${basedir}/src/main/java</sourceDirectory>
@@ -87,6 +106,7 @@
             <groupId>cloud.commandframework</groupId>
             <artifactId>cloud-paper</artifactId>
             <version>1.6.1</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.spigotmc</groupId>
