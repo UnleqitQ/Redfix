@@ -3,6 +3,7 @@ package de.redfox.redfix.modules;
 import de.redfox.redfix.RedfixPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.*;
@@ -49,7 +50,8 @@ public class God implements Listener {
 		if (event.getEntityType() == EntityType.PLAYER)
 			if (players.contains(event.getEntity().getUniqueId())) {
 				event.setCancelled(true);
-				event.setAmount(200);
+				Player player = (Player) event.getEntity();
+				player.setRemainingAir(300);
 				//event.setAmount(20);
 			}
 	}
