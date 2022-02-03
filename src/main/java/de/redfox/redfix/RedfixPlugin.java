@@ -11,6 +11,7 @@ import cloud.commandframework.paper.PaperCommandManager;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.modules.God;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -57,7 +58,9 @@ public class RedfixPlugin extends JavaPlugin {
 			e.printStackTrace();
 		}
 		
-		Command.Builder<CommandSender> builder = this.manager.commandBuilder("jail");
+		Command.Builder<CommandSender> builder;
+		
+		builder = this.manager.commandBuilder("jail");
 		builder = builder.senderType(Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
 			CommandSender sender = commandContext.getSender();
 			Player target = commandContext.get("player");
@@ -65,7 +68,6 @@ public class RedfixPlugin extends JavaPlugin {
 			Player player = commandContext.get("player");
 			player.sendMessage("Jailed XD");
 		});
-		
 		this.manager.command(builder);
 		
 		builder = this.manager.commandBuilder("god");
@@ -88,7 +90,28 @@ public class RedfixPlugin extends JavaPlugin {
 						player.sendMessage("Enabled God");
 					}
 				});
+		this.manager.command(builder);
 		
+		builder = this.manager.commandBuilder("heal");
+		builder = builder.senderType(Player.class)
+				.handler(commandContext -> {
+					Player player = (Player) commandContext.getSender();
+					player.setHealth(player.getAttribute(
+							Attribute.GENERIC_MAX_HEALTH).getValue() + player.getAbsorptionAmount());
+					player.setExhaustion(0);
+					player.setSaturation(20);
+					player.setSaturatedRegenRate(20);
+					player.sendMessage("You got healed");
+				});
+		this.manager.command(builder);
+		
+		builder = this.manager.commandBuilder("fly");
+		builder = builder.senderType(Player.class)
+				.handler(commandContext -> {
+					Player player = (Player) commandContext.getSender();
+					player.setAllowFlight(!player.getAllowFlight());
+					player.sendMessage(player.getAllowFlight() ? "Enabled fly" : "Disabled fly");
+				});
 		this.manager.command(builder);
 	}
 	

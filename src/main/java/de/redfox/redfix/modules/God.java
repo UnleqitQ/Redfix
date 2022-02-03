@@ -71,16 +71,16 @@ public class God implements Listener {
 	
 	@EventHandler
 	public void onTarget(@NotNull EntityTargetLivingEntityEvent event) {
-		if (event.getTarget().getType() == EntityType.PLAYER)
-			if (event.getTarget() != null && players.containsKey(event.getTarget().getUniqueId()) && players.get(
+		if (event.getTarget() != null && event.getTarget().getType() == EntityType.PLAYER)
+			if (players.containsKey(event.getTarget().getUniqueId()) && players.get(
 					event.getTarget().getUniqueId())[1])
 				event.setCancelled(true);
 	}
 	
 	@EventHandler
 	public void onTarget(@NotNull EntityTargetEvent event) {
-		if (event.getTarget().getType() == EntityType.PLAYER)
-			if (event.getTarget() != null && players.containsKey(event.getTarget().getUniqueId()) && players.get(
+		if (event.getTarget() != null && event.getTarget().getType() == EntityType.PLAYER)
+			if (players.containsKey(event.getTarget().getUniqueId()) && players.get(
 					event.getTarget().getUniqueId())[1])
 				event.setCancelled(true);
 	}
