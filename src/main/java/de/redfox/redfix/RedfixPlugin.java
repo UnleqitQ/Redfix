@@ -9,6 +9,7 @@ import cloud.commandframework.arguments.standard.FloatArgument;
 import cloud.commandframework.arguments.standard.IntegerArgument;
 import cloud.commandframework.arguments.standard.StringArgument;
 import cloud.commandframework.bukkit.parsers.EnchantmentArgument;
+import cloud.commandframework.bukkit.parsers.MaterialArgument;
 import cloud.commandframework.bukkit.parsers.PlayerArgument;
 import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
 import cloud.commandframework.execution.CommandExecutionCoordinator;
@@ -29,6 +30,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
@@ -309,7 +312,7 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Time
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("rftime", "time");
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("time", "rftime");
 			builder = builder.senderType(Player.class).argument(IntegerArgument.of("time"),
 					ArgumentDescription.of("Time")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -403,7 +406,7 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Enchant
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("rfenchant", "enchant");
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("enchant", "rfenchant");
 			builder = builder.senderType(Player.class).argument(EnchantmentArgument.of("enchantment"),
 					ArgumentDescription.of("The Enchantment to apply")).argument(IntegerArgument.of("level"),
 					ArgumentDescription.of("The Level to apply")).handler(commandContext -> {
@@ -431,13 +434,148 @@ public class RedfixPlugin extends JavaPlugin {
 					else {
 						player.getInventory().setItemInOffHand(item);
 					}
+					if (level > 0)
+						sendMessage(player, "Enchanted " + item.getType() + " with " + enchantment + " : " + level);
+					else
+						sendMessage(player, "Removed " + enchantment + " from " + item.getType());
 				} catch (Exception ignored) {
 				}
 			});
 			this.manager.command(builder);
 		}
 		
-		//TODO: weather, effect, i / give, clear, repair, unbreakable
+		//Give
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("i", "give", "item");
+			builder = builder.senderType(Player.class).argument(MaterialArgument.of("material"),
+					ArgumentDescription.of("The Item")).argument(IntegerArgument.optional("count", 1),
+					ArgumentDescription.of("The Count")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Material material = commandContext.get("material");
+				int count = commandContext.get("count");
+				try {
+					for (int i = 0; i < count / 64; i++) {
+						player.getInventory().addItem(new ItemStack(material, 64));
+					}
+					player.getInventory().addItem(new ItemStack(material, count % 64));
+				} catch (Exception ignored) {
+				}
+			}); this.manager.command(builder);
+		}
+		
+		//Repair
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("repair");
+			builder = builder.senderType(Player.class).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR) {
+						item = player.getInventory().getItemInOffHand();
+						if (item.getType() == Material.AIR) {
+							sendMessage(player, "You are not holding any item");
+							return;
+						}
+						if (!(item.getItemMeta() instanceof Damageable)) {
+							sendMessage(player, "You are not holding any damageable item");
+							return;
+						}
+						Damageable meta = (Damageable) item.getItemMeta();
+						meta.setDamage(0);
+						item.setItemMeta(meta);
+						player.getInventory().setItemInOffHand(item);
+					}
+					else {
+						if (!(item.getItemMeta() instanceof Damageable)) {
+							item = player.getInventory().getItemInOffHand();
+							if (item.getType() == Material.AIR) {
+								sendMessage(player, "You are not holding any damageable item");
+								return;
+							}
+							if (!(item.getItemMeta() instanceof Damageable)) {
+								sendMessage(player, "You are not holding any damageable item");
+								return;
+							}
+							Damageable meta = (Damageable) item.getItemMeta();
+							meta.setDamage(0);
+							item.setItemMeta(meta);
+							player.getInventory().setItemInOffHand(item);
+						}
+						else {
+							Damageable meta = (Damageable) item.getItemMeta();
+							meta.setDamage(0);
+							item.setItemMeta(meta);
+							player.getInventory().setItemInMainHand(item);
+						}
+					}
+					sendMessage(player, "Repaired " + item.getType());
+				} catch (Exception ignored) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//Unbreakable
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("unbreakable");
+			builder = builder.senderType(Player.class).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR)
+						item = player.getInventory().getItemInOffHand();
+					if (item.getType() == Material.AIR) {
+						sendMessage(player, "You are not holding any item");
+						return;
+					}
+					ItemMeta meta = item.getItemMeta();
+					meta.setUnbreakable(true);
+					item.setItemMeta(meta);
+					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+						player.getInventory().setItemInMainHand(item);
+					}
+					else {
+						player.getInventory().setItemInOffHand(item);
+					}
+					sendMessage(player, "Made " + item.getType() + " unbreakable");
+				} catch (Exception ignored) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//AddLore
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("addlore");
+			builder = builder.senderType(Player.class).argument(StringArgument.of("lore")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR)
+						item = player.getInventory().getItemInOffHand();
+					if (item.getType() == Material.AIR) {
+						sendMessage(player, "You are not holding any item");
+						return;
+					}
+					ItemMeta meta = item.getItemMeta();
+					List<String> lore = new ArrayList<>();
+					lore.addAll(meta.getLore());
+					lore.add(commandContext.get("lore"));
+					item.setItemMeta(meta);
+					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+						player.getInventory().setItemInMainHand(item);
+					}
+					else {
+						player.getInventory().setItemInOffHand(item);
+					}
+					sendMessage(player, "Added lore to " + item.getType());
+				} catch (Exception ignored) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//TODO: weather, effect, clear, unbreakable
 		//TODO: spawnmob, killall, suicide, sudo
 		//TODO: balance
 		//TODO: tp, tphere, tppos, tpall
