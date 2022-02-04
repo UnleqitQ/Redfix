@@ -349,6 +349,32 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Speed
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("speed");
+			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
+			builder = builder.senderType(Player.class).argument(speedArg,
+					ArgumentDescription.of("Speed")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				float speed = (float) commandContext.get("speed");
+				if (player.isFlying()) {
+					player.setFlySpeed(speed / 10);
+					sendMessage(player, "Set fly speed to " + speed);
+				}
+				else {
+					AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+					attributeInstance.getModifiers().stream().filter(
+							am -> am.getName().contentEquals("redfix")).forEach(
+							attributeInstance::removeModifier);
+					attributeInstance.addModifier(
+							new AttributeModifier("redfix", speed - 1, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+					player.setWalkSpeed(0.2f);
+					sendMessage(player, "Set walk speed to " + speed);
+				}
+			});
+			this.manager.command(builder);
+		}
+		
 		//Distance
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("distance");
@@ -372,7 +398,7 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//TODO: speed, distance, weather
+		//TODO: weather
 		//To Improve:
 		//TODO: ptime, pweather, time
 	}
