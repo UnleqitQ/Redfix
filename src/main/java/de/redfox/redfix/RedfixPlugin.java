@@ -147,19 +147,21 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("god");
-			builder = builder.senderType(Player.class).flag(CommandFlag.newBuilder("silent").withDescription(
+			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+							ArgumentDescription.of("player")).flag(CommandFlag.newBuilder("silent").withDescription(
 							ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
 							"s").build()).flag(CommandFlag.newBuilder("notarget").withDescription(
 							ArgumentDescription.of("Mobs don't target you")).withAliases("t").build())
 					//.argument(PlayerArgument.of("player"))
 					.handler(commandContext -> {
 						Player player = (Player) commandContext.getSender();
-						if (God.players.containsKey(player.getUniqueId())) {
-							God.players.remove(player.getUniqueId());
+						Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+						if (God.players.containsKey(target.getUniqueId())) {
+							God.players.remove(target.getUniqueId());
 							player.sendMessage("Disabled God");
 						}
 						else {
-							God.players.put(player.getUniqueId(), new Boolean[]{commandContext.flags().contains(
+							God.players.put(target.getUniqueId(), new Boolean[]{commandContext.flags().contains(
 									"silent"), commandContext.flags().contains("notarget")});
 							player.sendMessage("Enabled God");
 						}
@@ -168,24 +170,28 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
-			builder = builder.senderType(Player.class).handler(commandContext -> {
+			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+					ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				player.setHealth(
-						player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue() + player.getAbsorptionAmount());
-				player.setExhaustion(0);
-				player.setSaturation(20);
-				player.setFoodLevel(20);
-				player.sendMessage("You got healed");
+				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+				target.setHealth(
+						target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue() + target.getAbsorptionAmount());
+				target.setExhaustion(0);
+				target.setSaturation(20);
+				target.setFoodLevel(20);
+				target.sendMessage("You got healed");
 			});
 			this.manager.command(builder);
 		}
 		
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fly");
-			builder = builder.senderType(Player.class).handler(commandContext -> {
+			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+					ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				player.setAllowFlight(!player.getAllowFlight());
-				player.sendMessage(player.getAllowFlight() ? "Enabled fly" : "Disabled fly");
+				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+				target.setAllowFlight(!target.getAllowFlight());
+				player.sendMessage(target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
 			this.manager.command(builder);
 		}
