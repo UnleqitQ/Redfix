@@ -1,13 +1,11 @@
 package de.redfox.redfix.commands;
 
-import com.google.gson.*;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import de.redfox.redfix.RedfixPlugin;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -18,31 +16,31 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class CommandSpy implements Listener, CommandExecutor {
+	
 	private enum Messages {
 		PREFIX, COMMAND_DISABLE, COMMAND_ENABLE;
-
+		
 		String val;
-
+		
 		static String get(Messages... messages) {
 			StringBuilder ret = new StringBuilder();
 			for (Messages message : messages) {
 				ret.append(message.val);
 			}
-
+			
 			return ret.toString();
 		}
 	}
-
-
+	
+	
 	public Set<UUID> players = new HashSet<>();
-
+	
 	public CommandSpy() {
-		LanguageConfig language = ConfigManager.language;
+		/*LanguageConfig language = ConfigManager.language;
 		language.registerMessages(LanguageConfig.Locale.DE, Map.ofEntries(
 				Map.entry("prefix", "§cCommandSpy » "),
 				Map.entry("command_disable", "§7CommandSpy wurde §eaktiviert"),
@@ -51,8 +49,14 @@ public class CommandSpy implements Listener, CommandExecutor {
 
 		Messages.PREFIX.val = language.getMessage("prefix");
 		Messages.COMMAND_DISABLE.val = language.getMessage("command_disable");
-		Messages.COMMAND_ENABLE.val = language.getMessage("command_enable");
-
+		Messages.COMMAND_ENABLE.val = language.getMessage("command_enable");*/
+		
+		LanguageConfig language = ConfigManager.language;
+		
+		CommandSpy.Messages.PREFIX.val = language.getMessage("commandspy.prefix");
+		CommandSpy.Messages.COMMAND_DISABLE.val = language.getMessage("commandspy.command_disable");
+		CommandSpy.Messages.COMMAND_ENABLE.val = language.getMessage("commandspy.command_enable");
+		
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
 	}
 	
@@ -62,7 +66,8 @@ public class CommandSpy implements Listener, CommandExecutor {
 			if (players.contains(player.getUniqueId())) {
 				players.remove(player.getUniqueId());
 				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_DISABLE));
-			} else {
+			}
+			else {
 				players.add(player.getUniqueId());
 				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_ENABLE));
 			}
@@ -88,7 +93,7 @@ public class CommandSpy implements Listener, CommandExecutor {
 		JsonArray array = new JsonArray();
 		for (UUID uuid : players)
 			array.add(uuid.toString());
-
+		
 		ConfigManager.command_spy.set("players", array);
 	}
 	
@@ -96,11 +101,10 @@ public class CommandSpy implements Listener, CommandExecutor {
 		JsonElement jsonElement = ConfigManager.command_spy.get("players");
 		if (jsonElement == null)
 			return;
-
+		
 		for (JsonElement element : jsonElement.getAsJsonArray()) {
 			UUID uuid = UUID.fromString(element.getAsString());
-			if (Bukkit.getOnlinePlayers().stream()
-					.map(Player::getUniqueId).anyMatch(k -> k.equals(uuid))) {
+			if (Bukkit.getOnlinePlayers().stream().map(Player::getUniqueId).anyMatch(k -> k.equals(uuid))) {
 				players.add(uuid);
 			}
 		}

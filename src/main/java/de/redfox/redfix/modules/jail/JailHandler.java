@@ -29,6 +29,8 @@ public class JailHandler implements Listener {
 			JailedPlayer jp = jailedPlayers.get(event.getPlayer().getUniqueId());
 			if (!jp.active() || !jp.valid()) {
 				jailedPlayers.remove(jp.player);
+				RedfixPlugin.sendMessage(Bukkit.getPlayer(jp.player),
+						jp.valid() ? "Your jail was removed" : "Your time in jail ended");
 				return;
 			}
 			Location to = event.getTo();
@@ -42,6 +44,8 @@ public class JailHandler implements Listener {
 		for (JailedPlayer jp : jailedPlayers.values()) {
 			if (!jp.active() || !jp.valid()) {
 				jailedPlayers.remove(jp.player);
+				RedfixPlugin.sendMessage(Bukkit.getPlayer(jp.player),
+						jp.valid() ? "Your jail was removed" : "Your time in jail ended");
 			}
 		}
 	}

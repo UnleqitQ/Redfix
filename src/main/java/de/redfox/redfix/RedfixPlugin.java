@@ -12,18 +12,22 @@ import cloud.commandframework.execution.CommandExecutionCoordinator;
 import cloud.commandframework.paper.PaperCommandManager;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
+import de.redfox.redfix.config.LanguageConfig;
 import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
 import org.bukkit.Bukkit;
+import org.bukkit.Particle;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -81,7 +85,7 @@ public class RedfixPlugin extends JavaPlugin {
 					ArgumentDescription.of("The name of the jail to create")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				if (JailHandler.jails.containsKey(commandContext.get("name"))) {
-					sender.sendMessage("A jail with this name already exists");
+					sendMessage(sender, "A jail with this name already exists");
 					return;
 				}
 				Jail jail = new Jail(commandContext.get("name"), sender.getLocation().getBlock().getLocation());
@@ -96,7 +100,7 @@ public class RedfixPlugin extends JavaPlugin {
 					ArgumentDescription.of("The name of the jail to remove")).handler(commandContext -> {
 				CommandSender sender = (CommandSender) commandContext.getSender();
 				if (!JailHandler.jails.containsKey(commandContext.get("name"))) {
-					sender.sendMessage("This jail does not exist");
+					sendMessage(sender, "This jail does not exist");
 					return;
 				}
 				JailHandler.jails.remove(commandContext.get("name"));
@@ -112,16 +116,16 @@ public class RedfixPlugin extends JavaPlugin {
 				String name = (String) commandContext.get("name");
 				int duration = (int) commandContext.getOptional("duration").orElseGet(() -> -1);
 				if (!JailHandler.jails.containsKey(name)) {
-					sender.sendMessage("This jail does not exist");
+					sendMessage(sender, "This jail does not exist");
 					return;
 				}
 				
 				JailedPlayer jp = new JailedPlayer(player.getUniqueId(), name, duration);
 				JailHandler.jailedPlayers.put(player.getUniqueId(), jp);
 				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.teleport(jp.getJail().location));
-				sender.sendMessage(
+				sendMessage(sender,
 						"You jailed " + player.getName() + ((duration != -1) ? " for " + duration + " seconds" : ""));
-				player.sendMessage("You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
+				sendMessage(player, "You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
 			});
 			
 			Command.Builder<CommandSender> freeBuilder = topBuilder.literal("unjail").argument(
@@ -130,13 +134,13 @@ public class RedfixPlugin extends JavaPlugin {
 						CommandSender sender = commandContext.getSender();
 						Player player = commandContext.get("player");
 						if (!JailHandler.jailedPlayers.containsKey(player.getUniqueId())) {
-							sender.sendMessage("This player is not jailed");
+							sendMessage(sender, "This player is not jailed");
 							return;
 						}
 						
-						sender.sendMessage("You freed " + player.getName());
+						sendMessage(sender, "You freed " + player.getName());
 						JailHandler.jailedPlayers.remove(player.getUniqueId());
-						player.sendMessage("You got freed");
+						sendMessage(player, "You got freed");
 					});
 			
 			this.manager.command(createBuilder);
@@ -158,12 +162,12 @@ public class RedfixPlugin extends JavaPlugin {
 						Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 						if (God.players.containsKey(target.getUniqueId())) {
 							God.players.remove(target.getUniqueId());
-							player.sendMessage("Disabled God");
+							sendMessage(player, "Disabled God");
 						}
 						else {
 							God.players.put(target.getUniqueId(), new Boolean[]{commandContext.flags().contains(
 									"silent"), commandContext.flags().contains("notarget")});
-							player.sendMessage("Enabled God");
+							sendMessage(player, "Enabled God");
 						}
 					});
 			this.manager.command(builder);
@@ -171,7 +175,9 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
 			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
-					ArgumentDescription.of("player")).handler(commandContext -> {
+					ArgumentDescription.of("player")).flag(
+					CommandFlag.newBuilder("particle").withAliases("p").withDescription(
+							ArgumentDescription.of("Spawn a heart particle"))).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 				target.setHealth(
@@ -179,7 +185,10 @@ public class RedfixPlugin extends JavaPlugin {
 				target.setExhaustion(0);
 				target.setSaturation(20);
 				target.setFoodLevel(20);
-				target.sendMessage("You got healed");
+				sendMessage(target, "You got healed");
+				if (commandContext.flags().contains("particle")) {
+					target.getWorld().spawnParticle(Particle.HEART, target.getLocation().clone().add(0, 1.5, 0), 1);
+				}
 			});
 			this.manager.command(builder);
 		}
@@ -191,12 +200,16 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 				target.setAllowFlight(!target.getAllowFlight());
-				player.sendMessage(target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
+				sendMessage(player, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
 			this.manager.command(builder);
 		}
 		
 		//TODO: ptime, pweather, walkspeed, flyspeed, speed, distance, jail, weather, time
+	}
+	
+	public static void sendMessage(@NotNull CommandSender receiver, String message) {
+		receiver.sendMessage(ConfigManager.language.getMessage("prefix") + message);
 	}
 	
 	public void registerCommand(String cmd, CommandExecutor handler) {
@@ -206,5 +219,19 @@ public class RedfixPlugin extends JavaPlugin {
 	public static RedfixPlugin getInstance() {
 		return instance;
 	}
+	
+	//@formatter:off
+	public void initLanguage() {
+		LanguageConfig language = ConfigManager.language;
+		language.registerMessages(LanguageConfig.Locale.DE, Map.ofEntries(
+				Map.entry("commandspy.prefix", "§cCommandSpy » "),
+				Map.entry("commandspy.command_disable", "§7CommandSpy wurde §eaktiviert"),
+				Map.entry("commandspy.command_enable", "§7CommandSpy wurde §edeaktiviert"),
+				
+				Map.entry("prefix", "§4Red§eFix §b» §r"),
+				Map.entry("suffix", "§7CommandSpy wurde §eaktiviert")
+				));
+	}
+	//@formatter:on
 	
 }
