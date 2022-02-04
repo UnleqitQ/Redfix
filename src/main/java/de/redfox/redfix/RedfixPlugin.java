@@ -87,9 +87,11 @@ public class RedfixPlugin extends JavaPlugin {
 				Jail jail = new Jail(commandContext.get("name"), sender.getLocation().getBlock().getLocation());
 				JailHandler.jails.put(jail.name, jail);
 			});
+			
 			StringArgument.Builder jailArgument = StringArgument.newBuilder("name").withSuggestionsProvider(
 					(context, arg) -> JailHandler.jails.keySet().stream().filter(
 							s -> s.toLowerCase().contains(arg.toLowerCase())).toList());
+			
 			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").argument(jailArgument,
 					ArgumentDescription.of("The name of the jail to remove")).handler(commandContext -> {
 				CommandSender sender = (CommandSender) commandContext.getSender();
@@ -125,8 +127,8 @@ public class RedfixPlugin extends JavaPlugin {
 			Command.Builder<CommandSender> freeBuilder = topBuilder.literal("unjail").argument(
 					PlayerArgument.of("player"), ArgumentDescription.of("The player to unjail")).handler(
 					commandContext -> {
-						CommandSender sender = (CommandSender) commandContext.getSender();
-						Player player = (Player) commandContext.get("player");
+						CommandSender sender = commandContext.getSender();
+						Player player = commandContext.get("player");
 						if (!JailHandler.jailedPlayers.containsKey(player.getUniqueId())) {
 							sender.sendMessage("This player is not jailed");
 							return;
@@ -136,6 +138,7 @@ public class RedfixPlugin extends JavaPlugin {
 						JailHandler.jailedPlayers.remove(player.getUniqueId());
 						player.sendMessage("You got freed");
 					});
+			
 			this.manager.command(createBuilder);
 			this.manager.command(removeBuilder);
 			this.manager.command(jailBuilder);
