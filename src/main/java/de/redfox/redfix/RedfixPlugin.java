@@ -18,6 +18,7 @@ import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Particle;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.command.CommandExecutor;
@@ -27,8 +28,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 
 public class RedfixPlugin extends JavaPlugin {
@@ -50,6 +50,8 @@ public class RedfixPlugin extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		ConfigManager.init();
+		
+		initLanguage();
 		
 		new God();
 		new JailHandler();
@@ -205,6 +207,50 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("gamemode", "gm");
+			Map<String, GameMode> values = new HashMap<>();
+			values.put("0", GameMode.SURVIVAL);
+			values.put("survival", GameMode.SURVIVAL);
+			values.put("s", GameMode.SURVIVAL);
+			
+			values.put("2", GameMode.ADVENTURE);
+			values.put("adventure", GameMode.ADVENTURE);
+			values.put("a", GameMode.ADVENTURE);
+			
+			values.put("1", GameMode.CREATIVE);
+			values.put("creative", GameMode.CREATIVE);
+			values.put("c", GameMode.CREATIVE);
+			
+			values.put("3", GameMode.SPECTATOR);
+			values.put("spectator", GameMode.SPECTATOR);
+			
+			StringArgument.Builder gmArgument = StringArgument.newBuilder("gamemode").withSuggestionsProvider(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						values.keySet().stream().filter(v -> v.toLowerCase().contains(arg.toLowerCase())).forEach(
+								l::add);
+						return l;
+					});
+			
+			builder = builder.senderType(Player.class).argument(gmArgument,
+					ArgumentDescription.of("gamemode")).argument(PlayerArgument.optional("player"),
+					ArgumentDescription.of("player")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+				GameMode gameMode = values.get(commandContext.get("gamemode"));
+				if (gameMode == null) {
+					sendMessage(player, "Please use a valid gamemode");
+					return;
+				}
+				target.setGameMode(gameMode);
+				sendMessage(target,
+						"Switched GameMode to " + gameMode.name().substring(0, 1) + gameMode.name().substring(
+								1).toLowerCase());
+			});
+			this.manager.command(builder);
+		}
+		
 		//TODO: ptime, pweather, walkspeed, flyspeed, speed, distance, jail, weather, time
 	}
 	
@@ -228,7 +274,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Map.entry("commandspy.command_disable", "§7CommandSpy wurde §eaktiviert"),
 				Map.entry("commandspy.command_enable", "§7CommandSpy wurde §edeaktiviert"),
 				
-				Map.entry("prefix", "§4Red§eFix §b» §r"),
+				Map.entry("prefix", "§4Red§eFix §a» §r"),
 				Map.entry("suffix", "§7CommandSpy wurde §eaktiviert")
 				));
 	}
