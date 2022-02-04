@@ -16,6 +16,7 @@ import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
+import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -115,7 +116,7 @@ public class RedfixPlugin extends JavaPlugin {
 				
 				JailedPlayer jp = new JailedPlayer(player.getUniqueId(), name, duration);
 				JailHandler.jailedPlayers.put(player.getUniqueId(), jp);
-				player.teleport(jp.getJail().location);
+				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.teleport(jp.getJail().location));
 				sender.sendMessage(
 						"You jailed " + player.getName() + ((duration != -1) ? " for " + duration + " seconds" : ""));
 				player.sendMessage("You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
