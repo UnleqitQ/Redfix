@@ -212,6 +212,7 @@ public class RedfixPlugin extends JavaPlugin {
 			Map<String, GameMode> values = new HashMap<>();
 			values.put("0", GameMode.SURVIVAL);
 			values.put("survival", GameMode.SURVIVAL);
+			values.put("su", GameMode.SURVIVAL);
 			values.put("s", GameMode.SURVIVAL);
 			
 			values.put("2", GameMode.ADVENTURE);
@@ -224,6 +225,7 @@ public class RedfixPlugin extends JavaPlugin {
 			
 			values.put("3", GameMode.SPECTATOR);
 			values.put("spectator", GameMode.SPECTATOR);
+			values.put("sp", GameMode.SPECTATOR);
 			
 			StringArgument.Builder gmArgument = StringArgument.newBuilder("gamemode").withSuggestionsProvider(
 					(context, arg) -> {
