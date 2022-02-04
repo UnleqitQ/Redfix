@@ -437,12 +437,13 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//TODO: weather, effect, enchant, i / give, clear, repair, unbreakable
+		//TODO: weather, effect, i / give, clear, repair, unbreakable
+		//TODO: spawnmob, killall, suicide, sudo
 		//TODO: balance
 		//TODO: tp, tphere, tppos, tpall
 		//TODO: tpa, tpahere, tpaall, tpaaccept, tpareject / tpadeny
 		//To Improve:
-		//TODO: ptime, pweather, time
+		//TODO: ptime, pweather, time, enchant
 	}
 	
 	public static void sendMessage(@NotNull CommandSender receiver, String message) {
