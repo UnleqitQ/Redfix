@@ -228,8 +228,9 @@ public class RedfixPlugin extends JavaPlugin {
 			StringArgument.Builder gmArgument = StringArgument.newBuilder("gamemode").withSuggestionsProvider(
 					(context, arg) -> {
 						List<String> l = new ArrayList<>();
-						values.keySet().stream().filter(v -> v.toLowerCase().contains(arg.toLowerCase())).forEach(
-								l::add);
+						Arrays.stream(GameMode.values()).filter(
+								v -> v.name().toLowerCase().contains(arg.toLowerCase())).forEach(
+								v -> l.add(v.name().toLowerCase()));
 						return l;
 					});
 			
@@ -243,7 +244,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Please use a valid gamemode");
 					return;
 				}
-				target.setGameMode(gameMode);
+				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> target.setGameMode(gameMode));
 				sendMessage(target,
 						"Switched GameMode to " + gameMode.name().substring(0, 1) + gameMode.name().substring(
 								1).toLowerCase());
