@@ -4,6 +4,8 @@ import cloud.commandframework.ArgumentDescription;
 import cloud.commandframework.Command;
 import cloud.commandframework.CommandTree;
 import cloud.commandframework.arguments.flags.CommandFlag;
+import cloud.commandframework.arguments.standard.EnumArgument;
+import cloud.commandframework.arguments.standard.FloatArgument;
 import cloud.commandframework.arguments.standard.IntegerArgument;
 import cloud.commandframework.arguments.standard.StringArgument;
 import cloud.commandframework.bukkit.parsers.PlayerArgument;
@@ -17,14 +19,15 @@ import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Particle;
+import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -92,6 +95,7 @@ public class RedfixPlugin extends JavaPlugin {
 				}
 				Jail jail = new Jail(commandContext.get("name"), sender.getLocation().getBlock().getLocation());
 				JailHandler.jails.put(jail.name, jail);
+				sendMessage(sender, "Created jail \"" + jail.name + "\"");
 			});
 			
 			StringArgument.Builder jailArgument = StringArgument.newBuilder("name").withSuggestionsProvider(
@@ -106,6 +110,7 @@ public class RedfixPlugin extends JavaPlugin {
 					return;
 				}
 				JailHandler.jails.remove(commandContext.get("name"));
+				sendMessage(sender, "Removed jail \"" + commandContext.get("name") + "\"");
 			});
 			
 			Command.Builder<CommandSender> jailBuilder = topBuilder.literal("jail").argument(
@@ -151,6 +156,7 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(freeBuilder);
 		}
 		
+		//God
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("god");
 			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
@@ -174,6 +180,8 @@ public class RedfixPlugin extends JavaPlugin {
 					});
 			this.manager.command(builder);
 		}
+		
+		//Heal
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
 			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
@@ -195,18 +203,20 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Fly
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fly");
 			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
 					ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+				Player target = (Player) commandContext.getOptional("player").orElse(player);
 				target.setAllowFlight(!target.getAllowFlight());
 				sendMessage(player, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
 			this.manager.command(builder);
 		}
 		
+		//Gm
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("gamemode", "gm");
 			Map<String, GameMode> values = new HashMap<>();
@@ -254,7 +264,117 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//TODO: ptime, pweather, walkspeed, flyspeed, speed, distance, jail, weather, time
+		//PTime
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("ptime");
+			builder = builder.senderType(Player.class).argument(IntegerArgument.optional("time"),
+					ArgumentDescription.of("Time, if none given resets")).flag(
+					CommandFlag.newBuilder("relative").withAliases("r").withDescription(
+							ArgumentDescription.of("makes the player time relative"))).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				if (commandContext.contains("time")) {
+					int time = (int) commandContext.getOptional("time").orElse(0);
+					player.setPlayerTime(time, commandContext.flags().contains("relative"));
+					sendMessage(player, "Set player time");
+				}
+				else {
+					player.resetPlayerTime();
+					sendMessage(player, "Reset player time");
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//PWeather
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("pweather");
+			builder = builder.senderType(Player.class).argument(EnumArgument.optional(WeatherType.class, "weather"),
+					ArgumentDescription.of("Weather type, if none given resets")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				if (commandContext.contains("weather")) {
+					WeatherType type = (WeatherType) commandContext.getOptional("weather").orElse(WeatherType.CLEAR);
+					player.setPlayerWeather(type);
+					sendMessage(player, "Set player weather");
+				}
+				else {
+					player.resetPlayerWeather();
+					sendMessage(player, "Reset player weather");
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//Time
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("time");
+			builder = builder.senderType(Player.class).argument(IntegerArgument.of("time"),
+					ArgumentDescription.of("Time")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				int time = commandContext.get("time");
+				player.getWorld().setFullTime(time);
+				sendMessage(player, "Set time");
+			});
+			this.manager.command(builder);
+		}
+		
+		//Wspeed
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("wspeed");
+			builder = builder.senderType(Player.class).argument(FloatArgument.of("speed"),
+					ArgumentDescription.of("Walking speed")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				float speed = commandContext.get("speed");
+				AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+				attributeInstance.getModifiers().stream().filter(am -> am.getName().contentEquals("redfix")).forEach(
+						attributeInstance::removeModifier);
+				attributeInstance.addModifier(
+						new AttributeModifier("redfix", speed - 1, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+				player.setWalkSpeed(0.2f);
+				sendMessage(player, "Set walk speed to " + speed);
+			});
+			this.manager.command(builder);
+		}
+		
+		//Fspeed
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fspeed");
+			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
+			builder = builder.senderType(Player.class).argument(speedArg,
+					ArgumentDescription.of("Flying speed")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				float speed = (float) commandContext.get("speed");
+				player.setFlySpeed(speed / 10);
+				sendMessage(player, "Set fly speed to " + speed);
+			});
+			this.manager.command(builder);
+		}
+		
+		//Distance
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("distance");
+			builder = builder.senderType(Player.class).argument(PlayerArgument.of("player"),
+					ArgumentDescription.of("Player to measure distance to")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Player target = commandContext.get("player");
+				if (!player.getWorld().getUID().equals(target.getWorld().getUID())) {
+					sendMessage(player, "Target is in a different world");
+					return;
+				}
+				Location l1 = player.getLocation();
+				Location l2 = target.getLocation();
+				Vector v1 = l1.toVector();
+				Vector v2 = l2.toVector();
+				Vector d = v2.subtract(v1);
+				sendMessage(player, String.format("Measuring Distance to Player %s", target.getName()));
+				sendMessage(player, String.format("Distance: %3.02f", d.length()));
+				sendMessage(player, String.format("Difference: %3.02f %3.02f %3.02f", d.getX(), d.getY(), d.getZ()));
+			});
+			this.manager.command(builder);
+		}
+		
+		//TODO: speed, distance, weather
+		//To Improve:
+		//TODO: ptime, pweather, time
 	}
 	
 	public static void sendMessage(@NotNull CommandSender receiver, String message) {
