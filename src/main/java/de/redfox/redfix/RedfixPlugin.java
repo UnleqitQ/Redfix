@@ -8,6 +8,7 @@ import cloud.commandframework.arguments.standard.EnumArgument;
 import cloud.commandframework.arguments.standard.FloatArgument;
 import cloud.commandframework.arguments.standard.IntegerArgument;
 import cloud.commandframework.arguments.standard.StringArgument;
+import cloud.commandframework.bukkit.parsers.EnchantmentArgument;
 import cloud.commandframework.bukkit.parsers.PlayerArgument;
 import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
 import cloud.commandframework.execution.CommandExecutionCoordinator;
@@ -25,7 +26,9 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
@@ -306,7 +309,7 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Time
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("time");
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("rftime", "time");
 			builder = builder.senderType(Player.class).argument(IntegerArgument.of("time"),
 					ArgumentDescription.of("Time")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -353,25 +356,25 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("speed");
 			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
-			builder = builder.senderType(Player.class).argument(speedArg,
-					ArgumentDescription.of("Speed")).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				float speed = (float) commandContext.get("speed");
-				if (player.isFlying()) {
-					player.setFlySpeed(speed / 10);
-					sendMessage(player, "Set fly speed to " + speed);
-				}
-				else {
-					AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
-					attributeInstance.getModifiers().stream().filter(
-							am -> am.getName().contentEquals("redfix")).forEach(
-							attributeInstance::removeModifier);
-					attributeInstance.addModifier(
-							new AttributeModifier("redfix", speed - 1, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
-					player.setWalkSpeed(0.2f);
-					sendMessage(player, "Set walk speed to " + speed);
-				}
-			});
+			builder = builder.senderType(Player.class).argument(speedArg, ArgumentDescription.of("Speed")).handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						float speed = (float) commandContext.get("speed");
+						if (player.isFlying()) {
+							player.setFlySpeed(speed / 10);
+							sendMessage(player, "Set fly speed to " + speed);
+						}
+						else {
+							AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+							attributeInstance.getModifiers().stream().filter(
+									am -> am.getName().contentEquals("redfix")).forEach(
+									attributeInstance::removeModifier);
+							attributeInstance.addModifier(new AttributeModifier("redfix", speed - 1,
+									AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+							player.setWalkSpeed(0.2f);
+							sendMessage(player, "Set walk speed to " + speed);
+						}
+					});
 			this.manager.command(builder);
 		}
 		
@@ -398,7 +401,46 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//TODO: weather
+		//Enchant
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("rfenchant", "enchant");
+			builder = builder.senderType(Player.class).argument(EnchantmentArgument.of("enchantment"),
+					ArgumentDescription.of("The Enchantment to apply")).argument(IntegerArgument.of("level"),
+					ArgumentDescription.of("The Level to apply")).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Enchantment enchantment = commandContext.get("enchantment");
+				int level = commandContext.get("level");
+				try {
+					if (level < 0) {
+						sendMessage(player, "Please use as level at least 0");
+						return;
+					}
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR)
+						item = player.getInventory().getItemInOffHand();
+					if (item.getType() == Material.AIR) {
+						sendMessage(player, "You are not holding any item");
+						return;
+					}
+					item.removeEnchantment(enchantment);
+					if (level != 0)
+						item.addUnsafeEnchantment(enchantment, level);
+					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+						player.getInventory().setItemInMainHand(item);
+					}
+					else {
+						player.getInventory().setItemInOffHand(item);
+					}
+				} catch (Exception ignored) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//TODO: weather, effect, enchant, i / give, clear, repair, unbreakable
+		//TODO: balance
+		//TODO: tp, tphere, tppos, tpall
+		//TODO: tpa, tpahere, tpaall, tpaaccept, tpareject / tpadeny
 		//To Improve:
 		//TODO: ptime, pweather, time
 	}
