@@ -454,13 +454,14 @@ public class RedfixPlugin extends JavaPlugin {
 				Material material = commandContext.get("material");
 				int count = commandContext.get("count");
 				try {
-					for (int i = 0; i < count / 64; i++) {
-						player.getInventory().addItem(new ItemStack(material, 64));
+					for (int i = 0; i < count / material.getMaxStackSize(); i++) {
+						player.getInventory().addItem(new ItemStack(material, material.getMaxStackSize()));
 					}
-					player.getInventory().addItem(new ItemStack(material, count % 64));
+					player.getInventory().addItem(new ItemStack(material, count % material.getMaxStackSize()));
 				} catch (Exception ignored) {
 				}
-			}); this.manager.command(builder);
+			});
+			this.manager.command(builder);
 		}
 		
 		//Repair
@@ -559,8 +560,9 @@ public class RedfixPlugin extends JavaPlugin {
 					}
 					ItemMeta meta = item.getItemMeta();
 					List<String> lore = new ArrayList<>();
-					lore.addAll(meta.getLore());
+					lore.addAll(Objects.requireNonNullElse(meta.getLore(), new ArrayList<>()));
 					lore.add(commandContext.get("lore"));
+					meta.setLore(lore);
 					item.setItemMeta(meta);
 					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
 						player.getInventory().setItemInMainHand(item);
