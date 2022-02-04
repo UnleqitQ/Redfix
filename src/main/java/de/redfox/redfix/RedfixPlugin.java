@@ -28,11 +28,15 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
@@ -577,8 +581,68 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//TODO: weather, effect, clear
-		//TODO: spawnmob, killall, suicide, sudo
+		//SpawnMob
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("spawnmob");
+			builder = builder.senderType(Player.class).argument(EnumArgument.of(EntityType.class, "entity")).argument(
+					IntegerArgument.optional("count", 1)).handler(commandContext -> {
+				try {
+					Player player = (Player) commandContext.getSender();
+					EntityType type = commandContext.get("entity");
+					int count = commandContext.get("count");
+					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
+						RayTraceResult result = player.getWorld().rayTraceBlocks(player.getLocation(),
+								player.getLocation().getDirection(), 50);
+						if (result == null) {
+							for (int i = 0; i < count; i++) {
+								player.getWorld().spawnEntity(player.getLocation(), type);
+							}
+						}
+						else {
+							Location pos = player.getLocation().clone();
+							pos.setX(result.getHitPosition().getX());
+							pos.setY(result.getHitPosition().getY());
+							pos.setZ(result.getHitPosition().getZ());
+							for (int i = 0; i < count; i++) {
+								player.getWorld().spawnEntity(player.getLocation(), type);
+							}
+						}
+					});
+				} catch (Exception ignored) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		//Effect
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("effect");
+			StringArgument.Builder effectArgument = StringArgument.newBuilder("effect").withSuggestionsProvider(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						Arrays.stream(PotionEffectType.values()).filter(
+								et -> et.getName().replaceAll("\\W", "").toLowerCase().contains(
+										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.getName()));
+						return l;
+					});
+			builder = builder.senderType(Player.class).argument(effectArgument).argument(
+					IntegerArgument.optional("duration", 30)).argument(IntegerArgument.optional("level", 0)).handler(
+					commandContext -> {
+						try {
+							Player player = (Player) commandContext.getSender();
+							String effectName = ((String) commandContext.get("effect")).toLowerCase();
+							int duration = (int) commandContext.get("duration");
+							int level = (int) commandContext.get("level");
+							Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.addPotionEffect(
+									new PotionEffect(PotionEffectType.getByName(effectName), duration * 20, level)));
+						} catch (Exception ignored) {
+						}
+					});
+			this.manager.command(builder);
+		}
+		
+		//TODO: weather, clear
+		//TODO: killall, suicide, sudo
 		//TODO: balance
 		//TODO: tp, tphere, tppos, tpall
 		//TODO: tpa, tpahere, tpaall, tpaaccept, tpareject / tpadeny
