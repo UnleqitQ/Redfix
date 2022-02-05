@@ -4,7 +4,53 @@ main: de.redfox.redfix.RedfixPlugin
 api-version: 1.18
 authors: [ Kevin, UnleqitQ ]
 
-commands:
-  commandspy:
-    description: spy on commands
 
+permissions:
+  redfix.command.commandspy:
+    default: false
+  redfix.command.god:
+    default: op
+  redfix.command.gamemode:
+    default: op
+  redfix.command.heal:
+    default: op
+  redfix.command.speed:
+    default: op
+  redfix.command.walkspeed:
+    default: op
+  redfix.command.flyspeed:
+    default: op
+  redfix.command.jail.create:
+    default: op
+  redfix.command.jail.remove:
+    default: op
+  redfix.command.jail.jail:
+    default: op
+  redfix.command.jail.jail.permanent:
+    default: op
+  redfix.command.jail.unjail:
+    default: op
+  redfix.command.fly:
+    default: op
+  redfix.command.ptime:
+    default: op
+  redfix.command.pweather:
+    default: op
+  redfix.command.time:
+    default: op
+  redfix.command.distance:
+    default: op
+  redfix.command.enchant:
+    default: op
+  redfix.command.effect:
+    default: op
+  redfix.command.give:
+    default: op
+  redfix.command.repair:
+    default: op
+  redfix.command.unbreakable:
+    default: op
+  redfix.command.addlore:
+    default: op
+  redfix.command.spawnmob:
+    default: op

@@ -6,9 +6,6 @@ import de.redfox.redfix.RedfixPlugin;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -19,14 +16,14 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class CommandSpy implements Listener, CommandExecutor {
+public class CommandSpy implements Listener {
 	
-	private enum Messages {
+	public enum Messages {
 		PREFIX, COMMAND_DISABLE, COMMAND_ENABLE;
 		
 		String val;
 		
-		static String get(Messages... messages) {
+		public static String get(Messages... messages) {
 			StringBuilder ret = new StringBuilder();
 			for (Messages message : messages) {
 				ret.append(message.val);
@@ -58,22 +55,6 @@ public class CommandSpy implements Listener, CommandExecutor {
 		CommandSpy.Messages.COMMAND_ENABLE.val = language.getMessage("commandspy.command_enable");
 		
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
-	}
-	
-	@Override
-	public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-		if (commandSender instanceof Player player) {
-			if (players.contains(player.getUniqueId())) {
-				players.remove(player.getUniqueId());
-				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_DISABLE));
-			}
-			else {
-				players.add(player.getUniqueId());
-				player.sendMessage(Messages.get(Messages.PREFIX, Messages.COMMAND_ENABLE));
-			}
-			save();
-		}
-		return true;
 	}
 	
 	@EventHandler
