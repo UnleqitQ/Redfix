@@ -591,18 +591,15 @@ public class RedfixPlugin extends JavaPlugin {
 					EntityType type = commandContext.get("entity");
 					int count = commandContext.get("count");
 					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
-						RayTraceResult result = player.getWorld().rayTraceBlocks(player.getLocation(),
-								player.getLocation().getDirection(), 50);
+						RayTraceResult result = player.rayTraceBlocks(50);
 						if (result == null) {
 							for (int i = 0; i < count; i++) {
 								player.getWorld().spawnEntity(player.getLocation(), type);
 							}
 						}
 						else {
-							Location pos = player.getLocation().clone();
-							pos.setX(result.getHitPosition().getX());
-							pos.setY(result.getHitPosition().getY());
-							pos.setZ(result.getHitPosition().getZ());
+							Location pos = new Location(player.getWorld(), result.getHitPosition().getX(),
+									result.getHitPosition().getY(), result.getHitPosition().getZ());
 							for (int i = 0; i < count; i++) {
 								player.getWorld().spawnEntity(player.getLocation(), type);
 							}
