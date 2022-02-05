@@ -96,7 +96,7 @@ public class RedfixPlugin extends JavaPlugin {
 				player.sendMessage("Jailed XD");
 			});*/
 			Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
-					Player.class).argument(StringArgument.of("name"),
+					Player.class).permission("redfix.command.jail.create").argument(StringArgument.of("name"),
 					ArgumentDescription.of("The name of the jail to create")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				if (JailHandler.jails.containsKey(commandContext.get("name"))) {
@@ -112,7 +112,8 @@ public class RedfixPlugin extends JavaPlugin {
 					(context, arg) -> JailHandler.jails.keySet().stream().filter(
 							s -> s.toLowerCase().contains(arg.toLowerCase())).toList());
 			
-			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").argument(jailArgument,
+			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").permission(
+					"redfix.command.jail.remove").argument(jailArgument,
 					ArgumentDescription.of("The name of the jail to remove")).handler(commandContext -> {
 				CommandSender sender = (CommandSender) commandContext.getSender();
 				if (!JailHandler.jails.containsKey(commandContext.get("name"))) {
@@ -123,7 +124,8 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(sender, "Removed jail \"" + commandContext.get("name") + "\"");
 			});
 			
-			Command.Builder<CommandSender> jailBuilder = topBuilder.literal("jail").argument(
+			Command.Builder<CommandSender> jailBuilder = topBuilder.literal("jail").permission(
+					"redfix.command.jail.jail").argument(
 					PlayerArgument.of("player"), ArgumentDescription.of("The player to jail")).argument(jailArgument,
 					ArgumentDescription.of("The name of the jail to remove")).argument(
 					IntegerArgument.newBuilder("duration").withMin(1).withMax(60 * 60 * 24).asOptional(),
@@ -145,7 +147,8 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, "You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
 			});
 			
-			Command.Builder<CommandSender> freeBuilder = topBuilder.literal("unjail").argument(
+			Command.Builder<CommandSender> freeBuilder = topBuilder.literal("unjail").permission(
+					"redfix.command.jail.unjail").argument(
 					PlayerArgument.of("player"), ArgumentDescription.of("The player to unjail")).handler(
 					commandContext -> {
 						CommandSender sender = commandContext.getSender();
@@ -169,7 +172,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//God
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("god");
-			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+			builder = builder.senderType(Player.class).permission("redfix.command.god").argument(
+							PlayerArgument.optional("player"),
 							ArgumentDescription.of("player")).flag(CommandFlag.newBuilder("silent").withDescription(
 							ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
 							"s").build()).flag(CommandFlag.newBuilder("notarget").withDescription(
@@ -194,7 +198,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Heal
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
-			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+			builder = builder.senderType(Player.class).permission("redfix.command.heal").argument(
+					PlayerArgument.optional("player"),
 					ArgumentDescription.of("player")).flag(
 					CommandFlag.newBuilder("particle").withAliases("p").withDescription(
 							ArgumentDescription.of("Spawn a heart particle"))).handler(commandContext -> {
@@ -216,7 +221,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Fly
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fly");
-			builder = builder.senderType(Player.class).argument(PlayerArgument.optional("player"),
+			builder = builder.senderType(Player.class).permission("redfix.command.fly").argument(
+					PlayerArgument.optional("player"),
 					ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElse(player);
@@ -256,7 +262,7 @@ public class RedfixPlugin extends JavaPlugin {
 						return l;
 					});
 			
-			builder = builder.senderType(Player.class).argument(gmArgument,
+			builder = builder.senderType(Player.class).permission("redfix.command.gamemode").argument(gmArgument,
 					ArgumentDescription.of("gamemode")).argument(PlayerArgument.optional("player"),
 					ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -277,7 +283,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//PTime
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("ptime");
-			builder = builder.senderType(Player.class).argument(IntegerArgument.optional("time"),
+			builder = builder.senderType(Player.class).permission("redfix.command.ptime").argument(
+					IntegerArgument.optional("time"),
 					ArgumentDescription.of("Time, if none given resets")).flag(
 					CommandFlag.newBuilder("relative").withAliases("r").withDescription(
 							ArgumentDescription.of("makes the player time relative"))).handler(commandContext -> {
@@ -298,7 +305,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//PWeather
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("pweather");
-			builder = builder.senderType(Player.class).argument(EnumArgument.optional(WeatherType.class, "weather"),
+			builder = builder.senderType(Player.class).permission("redfix.command.pweather").argument(
+					EnumArgument.optional(WeatherType.class, "weather"),
 					ArgumentDescription.of("Weather type, if none given resets")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				if (commandContext.contains("weather")) {
@@ -317,7 +325,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Time
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("time", "rftime");
-			builder = builder.senderType(Player.class).argument(IntegerArgument.of("time"),
+			builder = builder.senderType(Player.class).permission("redfix.command.time").argument(
+					IntegerArgument.of("time"),
 					ArgumentDescription.of("Time")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				int time = commandContext.get("time");
@@ -329,8 +338,9 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Wspeed
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("wspeed");
-			builder = builder.senderType(Player.class).argument(FloatArgument.of("speed"),
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("walkspeed", "wspeed");
+			builder = builder.senderType(Player.class).permission("redfix.command.walkspeed").argument(
+					FloatArgument.of("speed"),
 					ArgumentDescription.of("Walking speed")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				float speed = commandContext.get("speed");
@@ -347,9 +357,9 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Fspeed
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fspeed");
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("flyspeed", "fspeed");
 			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
-			builder = builder.senderType(Player.class).argument(speedArg,
+			builder = builder.senderType(Player.class).permission("redfix.command.flyspeed").argument(speedArg,
 					ArgumentDescription.of("Flying speed")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				float speed = (float) commandContext.get("speed");
@@ -363,7 +373,8 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("speed");
 			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
-			builder = builder.senderType(Player.class).argument(speedArg, ArgumentDescription.of("Speed")).handler(
+			builder = builder.senderType(Player.class).permission("redfix.command.speed").argument(speedArg,
+					ArgumentDescription.of("Speed")).handler(
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
 						float speed = (float) commandContext.get("speed");
@@ -388,7 +399,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Distance
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("distance");
-			builder = builder.senderType(Player.class).argument(PlayerArgument.of("player"),
+			builder = builder.senderType(Player.class).permission("redfix.command.distance").argument(
+					PlayerArgument.of("player"),
 					ArgumentDescription.of("Player to measure distance to")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = commandContext.get("player");
@@ -411,7 +423,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Enchant
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("enchant", "rfenchant");
-			builder = builder.senderType(Player.class).argument(EnchantmentArgument.of("enchantment"),
+			builder = builder.senderType(Player.class).permission("redfix.command.enchant").argument(
+					EnchantmentArgument.of("enchantment"),
 					ArgumentDescription.of("The Enchantment to apply")).argument(IntegerArgument.of("level"),
 					ArgumentDescription.of("The Level to apply")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -451,7 +464,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Give
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("i", "give", "item");
-			builder = builder.senderType(Player.class).argument(MaterialArgument.of("material"),
+			builder = builder.senderType(Player.class).permission("redfix.command.give").argument(
+					MaterialArgument.of("material"),
 					ArgumentDescription.of("The Item")).argument(IntegerArgument.optional("count", 1),
 					ArgumentDescription.of("The Count")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -471,7 +485,7 @@ public class RedfixPlugin extends JavaPlugin {
 		//Repair
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("repair");
-			builder = builder.senderType(Player.class).handler(commandContext -> {
+			builder = builder.senderType(Player.class).permission("redfix.command.repair").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				try {
 					ItemStack item = player.getInventory().getItemInMainHand();
@@ -523,36 +537,38 @@ public class RedfixPlugin extends JavaPlugin {
 		//Unbreakable
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("unbreakable");
-			builder = builder.senderType(Player.class).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				try {
-					ItemStack item = player.getInventory().getItemInMainHand();
-					if (item.getType() == Material.AIR)
-						item = player.getInventory().getItemInOffHand();
-					if (item.getType() == Material.AIR) {
-						sendMessage(player, "You are not holding any item");
-						return;
-					}
-					ItemMeta meta = item.getItemMeta();
-					meta.setUnbreakable(true);
-					item.setItemMeta(meta);
-					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
-						player.getInventory().setItemInMainHand(item);
-					}
-					else {
-						player.getInventory().setItemInOffHand(item);
-					}
-					sendMessage(player, "Made " + item.getType() + " unbreakable");
-				} catch (Exception ignored) {
-				}
-			});
+			builder = builder.senderType(Player.class).permission("redfix.command.unbreakable").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						try {
+							ItemStack item = player.getInventory().getItemInMainHand();
+							if (item.getType() == Material.AIR)
+								item = player.getInventory().getItemInOffHand();
+							if (item.getType() == Material.AIR) {
+								sendMessage(player, "You are not holding any item");
+								return;
+							}
+							ItemMeta meta = item.getItemMeta();
+							meta.setUnbreakable(true);
+							item.setItemMeta(meta);
+							if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+								player.getInventory().setItemInMainHand(item);
+							}
+							else {
+								player.getInventory().setItemInOffHand(item);
+							}
+							sendMessage(player, "Made " + item.getType() + " unbreakable");
+						} catch (Exception ignored) {
+						}
+					});
 			this.manager.command(builder);
 		}
 		
 		//AddLore
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("addlore");
-			builder = builder.senderType(Player.class).argument(StringArgument.of("lore")).handler(commandContext -> {
+			builder = builder.senderType(Player.class).permission("redfix.command.addlore").argument(
+					StringArgument.of("lore")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				try {
 					ItemStack item = player.getInventory().getItemInMainHand();
@@ -584,7 +600,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//SpawnMob
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("spawnmob");
-			builder = builder.senderType(Player.class).argument(EnumArgument.of(EntityType.class, "entity")).argument(
+			builder = builder.senderType(Player.class).permission("redfix.command.spawnmob").argument(
+					EnumArgument.of(EntityType.class, "entity")).argument(
 					IntegerArgument.optional("count", 1)).handler(commandContext -> {
 				try {
 					Player player = (Player) commandContext.getSender();
@@ -622,7 +639,8 @@ public class RedfixPlugin extends JavaPlugin {
 										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.getName()));
 						return l;
 					});
-			builder = builder.senderType(Player.class).argument(effectArgument).argument(
+			builder = builder.senderType(Player.class).permission("redfix.command.effect").argument(
+					effectArgument).argument(
 					IntegerArgument.optional("duration", 30)).argument(IntegerArgument.optional("level", 0)).handler(
 					commandContext -> {
 						try {
