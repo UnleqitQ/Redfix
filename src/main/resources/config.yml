@@ -1,0 +1,6 @@
+chat:
+  distance: 50
+  shout:
+    prefix: "§a[Shout] "
+  ask:
+    prefix: "§9[Question] "

@@ -15,6 +15,7 @@ import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
 import cloud.commandframework.execution.CommandExecutionCoordinator;
 import cloud.commandframework.paper.PaperCommandManager;
 import cloud.commandframework.permission.Permission;
+import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
@@ -65,6 +66,9 @@ public class RedfixPlugin extends JavaPlugin {
 	public void onEnable() {
 		ConfigManager.init();
 		
+		saveDefaultConfig();
+		reloadConfig();
+		
 		initLanguage();
 		
 		new God();
@@ -73,6 +77,9 @@ public class RedfixPlugin extends JavaPlugin {
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommands();
+		
+		
+		new ChatListener();
 	}
 	
 	private void registerCommands() {
@@ -176,12 +183,12 @@ public class RedfixPlugin extends JavaPlugin {
 		//God
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("god");
-			builder = builder.senderType(Player.class).permission("redfix.command.god").argument(
-							PlayerArgument.optional("player"), ArgumentDescription.of("player")).flag(
+			builder = builder.senderType(Player.class).permission("redfix.command.god").flag(
 							CommandFlag.newBuilder("silent").withDescription(
 									ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
 									"s").build()).flag(CommandFlag.newBuilder("notarget").withDescription(
-							ArgumentDescription.of("Mobs don't target you")).withAliases("t").build())
+							ArgumentDescription.of("Mobs don't target you")).withAliases("t").build()).argument(
+							PlayerArgument.optional("player"), ArgumentDescription.of("player"))
 					//.argument(PlayerArgument.of("player"))
 					.handler(commandContext -> {
 						Player player = (Player) commandContext.getSender();
@@ -202,10 +209,10 @@ public class RedfixPlugin extends JavaPlugin {
 		//Heal
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
-			builder = builder.senderType(Player.class).permission("redfix.command.heal").argument(
-					PlayerArgument.optional("player"), ArgumentDescription.of("player")).flag(
+			builder = builder.senderType(Player.class).permission("redfix.command.heal").flag(
 					CommandFlag.newBuilder("particle").withAliases("p").withDescription(
-							ArgumentDescription.of("Spawn a heart particle"))).handler(commandContext -> {
+							ArgumentDescription.of("Spawn a heart particle"))).argument(
+					PlayerArgument.optional("player"), ArgumentDescription.of("player")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 				target.setHealth(
@@ -285,21 +292,22 @@ public class RedfixPlugin extends JavaPlugin {
 		//PTime
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("ptime");
-			builder = builder.senderType(Player.class).permission("redfix.command.ptime").argument(
-					IntegerArgument.optional("time"), ArgumentDescription.of("Time, if none given resets")).flag(
+			builder = builder.senderType(Player.class).permission("redfix.command.ptime").flag(
 					CommandFlag.newBuilder("relative").withAliases("r").withDescription(
-							ArgumentDescription.of("makes the player time relative"))).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				if (commandContext.contains("time")) {
-					int time = (int) commandContext.getOptional("time").orElse(0);
-					player.setPlayerTime(time, commandContext.flags().contains("relative"));
-					sendMessage(player, "Set player time");
-				}
-				else {
-					player.resetPlayerTime();
-					sendMessage(player, "Reset player time");
-				}
-			});
+							ArgumentDescription.of("makes the player time relative"))).argument(
+					IntegerArgument.optional("time"), ArgumentDescription.of("Time, if none given resets")).handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						if (commandContext.contains("time")) {
+							int time = (int) commandContext.getOptional("time").orElse(0);
+							player.setPlayerTime(time, commandContext.flags().contains("relative"));
+							sendMessage(player, "Set player time");
+						}
+						else {
+							player.resetPlayerTime();
+							sendMessage(player, "Reset player time");
+						}
+					});
 			this.manager.command(builder);
 		}
 		
@@ -484,30 +492,35 @@ public class RedfixPlugin extends JavaPlugin {
 		//Repair
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("repair");
-			builder = builder.senderType(Player.class).permission("redfix.command.repair").handler(commandContext -> {
+			builder = builder.senderType(Player.class).permission("redfix.command.repair").flag(
+					CommandFlag.newBuilder("all").withAliases("a").withDescription(
+							ArgumentDescription.of("Repairs all your items"))).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				try {
-					ItemStack item = player.getInventory().getItemInMainHand();
-					if (item.getType() == Material.AIR) {
-						item = player.getInventory().getItemInOffHand();
-						if (item.getType() == Material.AIR) {
-							sendMessage(player, "You are not holding any item");
-							return;
+				if (commandContext.flags().contains("all")) {
+					try {
+						for (int i = 0; i < player.getInventory().getSize(); i++) {
+							ItemStack item = player.getInventory().getItem(i);
+							if (item == null)
+								continue;
+							if (item.getType() == Material.AIR)
+								continue;
+							if (item.getItemMeta() instanceof Damageable meta) {
+								meta.setDamage(0);
+								item.setItemMeta(meta);
+								player.getInventory().setItem(i, item);
+							}
 						}
-						if (!(item.getItemMeta() instanceof Damageable)) {
-							sendMessage(player, "You are not holding any damageable item");
-							return;
-						}
-						Damageable meta = (Damageable) item.getItemMeta();
-						meta.setDamage(0);
-						item.setItemMeta(meta);
-						player.getInventory().setItemInOffHand(item);
+					} catch (Exception ignored) {
 					}
-					else {
-						if (!(item.getItemMeta() instanceof Damageable)) {
+					sendMessage(player, "Repaired all");
+				}
+				else {
+					try {
+						ItemStack item = player.getInventory().getItemInMainHand();
+						if (item.getType() == Material.AIR) {
 							item = player.getInventory().getItemInOffHand();
 							if (item.getType() == Material.AIR) {
-								sendMessage(player, "You are not holding any damageable item");
+								sendMessage(player, "You are not holding any item");
 								return;
 							}
 							if (!(item.getItemMeta() instanceof Damageable)) {
@@ -520,14 +533,31 @@ public class RedfixPlugin extends JavaPlugin {
 							player.getInventory().setItemInOffHand(item);
 						}
 						else {
-							Damageable meta = (Damageable) item.getItemMeta();
-							meta.setDamage(0);
-							item.setItemMeta(meta);
-							player.getInventory().setItemInMainHand(item);
+							if (!(item.getItemMeta() instanceof Damageable)) {
+								item = player.getInventory().getItemInOffHand();
+								if (item.getType() == Material.AIR) {
+									sendMessage(player, "You are not holding any damageable item");
+									return;
+								}
+								if (!(item.getItemMeta() instanceof Damageable)) {
+									sendMessage(player, "You are not holding any damageable item");
+									return;
+								}
+								Damageable meta = (Damageable) item.getItemMeta();
+								meta.setDamage(0);
+								item.setItemMeta(meta);
+								player.getInventory().setItemInOffHand(item);
+							}
+							else {
+								Damageable meta = (Damageable) item.getItemMeta();
+								meta.setDamage(0);
+								item.setItemMeta(meta);
+								player.getInventory().setItemInMainHand(item);
+							}
 						}
+						sendMessage(player, "Repaired " + item.getType());
+					} catch (Exception ignored) {
 					}
-					sendMessage(player, "Repaired " + item.getType());
-				} catch (Exception ignored) {
 				}
 			});
 			this.manager.command(builder);
@@ -680,6 +710,62 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Item Attribute Modifier
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("itemattributemodifier");
+			StringArgument.Builder attributeArgument = StringArgument.newBuilder("attribute").withSuggestionsProvider(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						Arrays.stream(Attribute.values()).filter(
+								et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
+										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
+						return l;
+					});
+			StringArgument.Builder operationArgument = StringArgument.newBuilder("operation").withSuggestionsProvider(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						Arrays.stream(AttributeModifier.Operation.values()).filter(
+								et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
+										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
+						return l;
+					});
+			builder = builder.senderType(Player.class).permission("redfix.command.itemattributemodifier").argument(
+					attributeArgument).argument(operationArgument).argument(FloatArgument.of("amount")).handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						try {
+							Attribute attribute = Attribute.valueOf((String) commandContext.get("attribute"));
+							AttributeModifier.Operation operation = AttributeModifier.Operation.valueOf(
+									(String) commandContext.get("operation"));
+							float amount = (float) commandContext.get("amount");
+							UUID uuid = UUID.randomUUID();
+							AttributeModifier modifier = new AttributeModifier("", amount, operation);
+							
+							ItemStack item = player.getInventory().getItemInMainHand();
+							if (item.getType() == Material.AIR) {
+								item = player.getInventory().getItemInOffHand();
+								if (item.getType() == Material.AIR) {
+									sendMessage(player, "You are not holding any item");
+									return;
+								}
+								ItemMeta meta = item.getItemMeta();
+								meta.addAttributeModifier(attribute, modifier);
+								item.setItemMeta(meta);
+								player.getInventory().setItemInOffHand(item);
+							}
+							else {
+								Damageable meta = (Damageable) item.getItemMeta();
+								meta.addAttributeModifier(attribute, modifier);
+								item.setItemMeta(meta);
+								player.getInventory().setItemInMainHand(item);
+							}
+							sendMessage(player, "Added attribute modifier " + modifier + " to " + item.getType());
+						} catch (Exception ignored) {
+						}
+					});
+			this.manager.command(builder);
+		}
+		
 		//TODO: weather, clear
 		//TODO: killall, suicide, sudo
 		//TODO: balance
@@ -710,7 +796,8 @@ public class RedfixPlugin extends JavaPlugin {
 				Map.entry("commandspy.command_disable", "§7CommandSpy wurde §edeaktiviert"),
 				
 				Map.entry("prefix", "§4Red§eFix §a» §r"),
-				Map.entry("suffix", "§7CommandSpy wurde §eaktiviert")
+				Map.entry("chat.shout.prefix", "§a[Shout] "),
+				Map.entry("chat.ask.prefix", "§9[Question] ")
 				));
 	}
 	//@formatter:on
