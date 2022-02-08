@@ -786,9 +786,10 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
-		//Item Attribute Modifier
+		//Item Attribute
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("itemattributemodifier");
+			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("itemattribute").permission(
+					"redfix.command.itemattribute");
 			StringArgument.Builder attributeArgument = StringArgument.newBuilder("attribute").withSuggestionsProvider(
 					(context, arg) -> {
 						List<String> l = new ArrayList<>();
@@ -813,7 +814,27 @@ public class RedfixPlugin extends JavaPlugin {
 								arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
 				return l;
 			}).asOptionalWithDefault("");
-			builder = builder.senderType(Player.class).permission("redfix.command.itemattributemodifier").argument(
+			StringArgument.Builder uuidArgument = (StringArgument.Builder) StringArgument.newBuilder(
+					"uuid").withSuggestionsProvider((context, arg) -> {
+				List<String> l = new ArrayList<>();
+				Player player = (Player) context.getSender();
+				ItemStack item = null;
+				if (player.getInventory().getItemInMainHand() == null || player.getInventory().getItemInMainHand().getType() == Material.AIR) {
+					if (player.getInventory().getItemInOffHand() == null || player.getInventory().getItemInOffHand().getType() == Material.AIR) {
+						return List.of("You are not holding any item");
+					}
+					else
+						item = player.getInventory().getItemInOffHand();
+				}
+				else
+					item = player.getInventory().getItemInMainHand();
+				ItemMeta meta = item.getItemMeta();
+				for (AttributeModifier modifier : meta.getAttributeModifiers().values()) {
+					l.add(modifier.getUniqueId().toString());
+				}
+				return l;
+			});
+			Command.Builder<CommandSender> addBuilder = topBuilder.literal("add").senderType(Player.class).argument(
 					attributeArgument).argument(operationArgument).argument(FloatArgument.of("amount")).argument(
 					slotArgument).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -854,7 +875,44 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception ignore) {
 				}
 			});
-			this.manager.command(builder);
+			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").senderType(
+					Player.class).argument(uuidArgument).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					UUID uuid = UUID.fromString((String) commandContext.get("uuid"));
+					
+					Map.Entry<Attribute, AttributeModifier> entry;
+					
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR) {
+						item = player.getInventory().getItemInOffHand();
+						if (item.getType() == Material.AIR) {
+							sendMessage(player, "You are not holding any item");
+							return;
+						}
+						ItemMeta meta = item.getItemMeta();
+						entry = meta.getAttributeModifiers().entries().stream().filter(
+								e -> e.getValue().getUniqueId().equals(uuid)).findFirst().get();
+						meta.removeAttributeModifier(entry.getKey(), entry.getValue());
+						item.setItemMeta(meta);
+						player.getInventory().setItemInOffHand(item);
+					}
+					else {
+						Damageable meta = (Damageable) item.getItemMeta();
+						entry = meta.getAttributeModifiers().entries().stream().filter(
+								e -> e.getValue().getUniqueId().equals(uuid)).findFirst().get();
+						meta.removeAttributeModifier(entry.getKey(), entry.getValue());
+						item.setItemMeta(meta);
+						player.getInventory().setItemInMainHand(item);
+					}
+					sendMessage(player,
+							"Removed attribute modifier " + entry.getValue() + " (" + entry.getKey() + ") from " + item.getType());
+				} catch (Exception ignore) {
+				}
+			});
+			
+			this.manager.command(addBuilder);
+			this.manager.command(removeBuilder);
 		}
 		
 		//Bal

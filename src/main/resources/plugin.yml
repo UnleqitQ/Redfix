@@ -10,6 +10,8 @@ permissions:
     default: false
   redfix.command.god:
     default: op
+  redfix.command.itemattribute:
+    default: op
   redfix.command.gamemode:
     default: op
   redfix.command.heal:
@@ -54,3 +56,19 @@ permissions:
     default: op
   redfix.command.spawnmob:
     default: op
+  redfix.command.economy.set:
+    default: op
+  redfix.command.economy.reset:
+    default: op
+  redfix.command.economy.give:
+    default: op
+  redfix.command.economy.take:
+    default: op
+  redfix.command.playtime:
+    default: true
+  redfix.command.playtimetop:
+    default: true
+  redfix.command.balance:
+    default: true
+  redfix.command.balancetop:
+    default: true
