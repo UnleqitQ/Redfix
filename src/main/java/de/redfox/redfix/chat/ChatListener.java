@@ -21,22 +21,27 @@ public class ChatListener implements Listener {
 		String message = event.getMessage();
 		Player player = event.getPlayer();
 		message = message.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
-		String msg = "[" + player.getCustomName() + "] " + message;
+		String name = (RedfixPlugin.getInstance().chat.getPlayerPrefix(
+				player) + player.getCustomName() + RedfixPlugin.getInstance().chat.getPlayerSuffix(player)).replaceAll(
+				"&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
 		if (event.getMessage().startsWith("!")) {
-			Bukkit.broadcastMessage(
-					RedfixPlugin.getInstance().getConfig().getString("chat.shout.prefix", "§a[Shout] ") + msg);
+			String msg = name + "§7 >> §r" + message.substring(1);
+			Bukkit.broadcastMessage(RedfixPlugin.getInstance().getConfig().getString("chat.shout.prefix",
+					"§a[Shout] ") + msg);
 			//event.getRecipients().forEach(p -> p.sendMessage(msg));
 		}
 		else if (event.getMessage().startsWith("?")) {
-			Bukkit.broadcastMessage(
-					RedfixPlugin.getInstance().getConfig().getString("chat.ask.prefix", "§9[Question] ") + msg);
+			String msg = name + "§7 >> §r" + message.substring(1);
+			Bukkit.broadcastMessage(RedfixPlugin.getInstance().getConfig().getString("chat.ask.prefix",
+					"§9[Question] ") + msg);
 			//event.getRecipients().forEach(p -> p.sendMessage(msg));
 		}
 		else {
+			String msg = name + "§7 >> §r" + message;
 			double dist = RedfixPlugin.getInstance().getConfig().getDouble("chat.distance", 50);
-			player.getNearbyEntities(dist, dist, dist).stream().filter(
-					e -> e.getLocation().distance(player.getLocation()) <= dist).filter(
-					e -> e instanceof Player).forEach(e -> ((Player) e).sendMessage(msg));
+			Bukkit.getOnlinePlayers().stream().filter(
+					p -> (p.getWorld().equals(player.getWorld()) && p.getLocation().distance(
+							player.getLocation()) < dist)).forEach(p -> p.sendMessage(msg));
 		}
 	}
 	

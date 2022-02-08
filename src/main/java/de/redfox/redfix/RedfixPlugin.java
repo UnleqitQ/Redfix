@@ -4,12 +4,10 @@ import cloud.commandframework.ArgumentDescription;
 import cloud.commandframework.Command;
 import cloud.commandframework.CommandTree;
 import cloud.commandframework.arguments.flags.CommandFlag;
-import cloud.commandframework.arguments.standard.EnumArgument;
-import cloud.commandframework.arguments.standard.FloatArgument;
-import cloud.commandframework.arguments.standard.IntegerArgument;
-import cloud.commandframework.arguments.standard.StringArgument;
+import cloud.commandframework.arguments.standard.*;
 import cloud.commandframework.bukkit.parsers.EnchantmentArgument;
 import cloud.commandframework.bukkit.parsers.MaterialArgument;
+import cloud.commandframework.bukkit.parsers.OfflinePlayerArgument;
 import cloud.commandframework.bukkit.parsers.PlayerArgument;
 import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
 import cloud.commandframework.execution.CommandExecutionCoordinator;
@@ -19,10 +17,12 @@ import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
+import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
+import net.milkbowl.vault.chat.Chat;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -32,9 +32,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -51,6 +53,7 @@ public class RedfixPlugin extends JavaPlugin {
 	private static RedfixPlugin instance;
 	public CommandSpy commandSpy;
 	public static final String pluginPath = "plugins/Redfix";
+	public Chat chat;
 	
 	public RedfixPlugin() {
 		instance = this;
@@ -77,7 +80,9 @@ public class RedfixPlugin extends JavaPlugin {
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommands();
-		
+		RegisteredServiceProvider<Chat> rsp = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
+				Chat.class);
+		chat = rsp.getProvider();
 		
 		new ChatListener();
 	}
@@ -729,40 +734,134 @@ public class RedfixPlugin extends JavaPlugin {
 										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
 						return l;
 					});
+			StringArgument.Builder slotArgument = (StringArgument.Builder) StringArgument.newBuilder(
+					"slot").withSuggestionsProvider((context, arg) -> {
+				List<String> l = new ArrayList<>();
+				Arrays.stream(EquipmentSlot.values()).filter(
+						et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
+								arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
+				return l;
+			}).asOptionalWithDefault("");
 			builder = builder.senderType(Player.class).permission("redfix.command.itemattributemodifier").argument(
-					attributeArgument).argument(operationArgument).argument(FloatArgument.of("amount")).handler(
+					attributeArgument).argument(operationArgument).argument(FloatArgument.of("amount")).argument(
+					slotArgument).handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					Attribute attribute = Attribute.valueOf((String) commandContext.get("attribute"));
+					AttributeModifier.Operation operation = AttributeModifier.Operation.valueOf(
+							(String) commandContext.get("operation"));
+					String slotString = (String) commandContext.getOrDefault("slot", "");
+					float amount = (float) commandContext.get("amount");
+					
+					AttributeModifier modifier;
+					try {
+						EquipmentSlot slot = EquipmentSlot.valueOf(slotString);
+						modifier = new AttributeModifier(UUID.randomUUID(), "", amount, operation, slot);
+					} catch (IllegalArgumentException ignore) {
+						modifier = new AttributeModifier("", amount, operation);
+					}
+					
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR) {
+						item = player.getInventory().getItemInOffHand();
+						if (item.getType() == Material.AIR) {
+							sendMessage(player, "You are not holding any item");
+							return;
+						}
+						ItemMeta meta = item.getItemMeta();
+						meta.addAttributeModifier(attribute, modifier);
+						item.setItemMeta(meta);
+						player.getInventory().setItemInOffHand(item);
+					}
+					else {
+						Damageable meta = (Damageable) item.getItemMeta();
+						meta.addAttributeModifier(attribute, modifier);
+						item.setItemMeta(meta);
+						player.getInventory().setItemInMainHand(item);
+					}
+					sendMessage(player, "Added attribute modifier " + modifier + " to " + item.getType());
+				} catch (Exception ignore) {
+				}
+			});
+			this.manager.command(builder);
+		}
+		
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balance", "bal", "money");
+			builder = builder.senderType(Player.class).permission("redfix.command.balance").argument(
+					OfflinePlayerArgument.optional("player"), ArgumentDescription.of("player")).handler(
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
-						try {
-							Attribute attribute = Attribute.valueOf((String) commandContext.get("attribute"));
-							AttributeModifier.Operation operation = AttributeModifier.Operation.valueOf(
-									(String) commandContext.get("operation"));
-							float amount = (float) commandContext.get("amount");
-							UUID uuid = UUID.randomUUID();
-							AttributeModifier modifier = new AttributeModifier("", amount, operation);
-							
-							ItemStack item = player.getInventory().getItemInMainHand();
-							if (item.getType() == Material.AIR) {
-								item = player.getInventory().getItemInOffHand();
-								if (item.getType() == Material.AIR) {
-									sendMessage(player, "You are not holding any item");
-									return;
-								}
-								ItemMeta meta = item.getItemMeta();
-								meta.addAttributeModifier(attribute, modifier);
-								item.setItemMeta(meta);
-								player.getInventory().setItemInOffHand(item);
-							}
-							else {
-								Damageable meta = (Damageable) item.getItemMeta();
-								meta.addAttributeModifier(attribute, modifier);
-								item.setItemMeta(meta);
-								player.getInventory().setItemInMainHand(item);
-							}
-							sendMessage(player, "Added attribute modifier " + modifier + " to " + item.getType());
-						} catch (Exception ignored) {
-						}
+						OfflinePlayer target = (Player) commandContext.getOptional("player").orElse(player);
+						sendMessage(player,
+								"§aBalance: " + EconomyManager.getMoney(target.getUniqueId()) + getConfig().getString(
+										"economy.symbol", "$"));
 					});
+			this.manager.command(builder);
+		}
+		
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balancetop", "baltop");
+			builder = builder.senderType(Player.class).permission("redfix.command.balance").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				final double[] value = {Double.MIN_VALUE};
+				final UUID[] uuid = {null};
+				EconomyManager.getAll().forEach((uuid0, value0) -> {
+					if (value0 > value[0]) {
+						value[0] = value0;
+						uuid[0] = uuid0;
+					}
+				});
+				sendMessage(player, "§cPlayer: " + Bukkit.getOfflinePlayer(uuid[0]).getName());
+				sendMessage(player, "§aBalance: " + value + getConfig().getString("economy.symbol", "$"));
+			});
+			this.manager.command(builder);
+		}
+		
+		//Economy
+		{
+			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("economy", "eco");
+			/*Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
+					Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				Player target = commandContext.get("player");
+				sender.sendMessage("You jailed " + target.getName());
+				Player player = commandContext.get("player");
+				player.sendMessage("Jailed XD");
+			});*/
+			Command.Builder<CommandSender> setBuilder = topBuilder.literal("set").permission(
+					Permission.of("redfix.command.economy.set")).argument(OfflinePlayerArgument.of("player")).argument(
+					DoubleArgument.of("amount")).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				OfflinePlayer player = commandContext.get("player");
+				double amount = commandContext.get("amount");
+				EconomyManager.setMoney(player.getUniqueId(), amount);
+				sendMessage(sender, "Set money of player " + player.getName() + " to " + amount + getConfig().getString(
+						"economy.symbol", "$"));
+			});
+			
+			this.manager.command(setBuilder);
+		}
+		
+		//Pay
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("pay").argument(
+					OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount")).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						OfflinePlayer player = commandContext.get("player");
+						double amount = commandContext.get("amount");
+						EconomyManager.setMoney(player.getUniqueId(), amount);
+						if (EconomyManager.getMoney(sender.getUniqueId()) < amount) {
+							sendMessage(sender, "You have not enough money");
+							return;
+						}
+						sendMessage(sender, "Payed " + amount + getConfig().getString("economy.symbol",
+								"$") + " to " + player.getName());
+						sendMessage(sender, "You got " + amount + getConfig().getString("economy.symbol",
+								"$") + " from " + sender.getDisplayName());
+					});
+			
 			this.manager.command(builder);
 		}
 		
