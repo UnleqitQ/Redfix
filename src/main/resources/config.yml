@@ -4,3 +4,6 @@ chat:
     prefix: "§a[Shout] "
   ask:
     prefix: "§9[Question] "
+
+economy:
+  symbol: "$"
