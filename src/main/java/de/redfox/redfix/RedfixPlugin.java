@@ -18,11 +18,13 @@ import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
 import de.redfox.redfix.economy.EconomyManager;
+import de.redfox.redfix.economy.VaultEconomy;
 import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
 import net.milkbowl.vault.chat.Chat;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -37,6 +39,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -53,7 +56,8 @@ public class RedfixPlugin extends JavaPlugin {
 	private static RedfixPlugin instance;
 	public CommandSpy commandSpy;
 	public static final String pluginPath = "plugins/Redfix";
-	public Chat chat;
+	public Chat vaultChat;
+	public VaultEconomy vaultEconomy;
 	
 	public RedfixPlugin() {
 		instance = this;
@@ -72,6 +76,8 @@ public class RedfixPlugin extends JavaPlugin {
 		saveDefaultConfig();
 		reloadConfig();
 		
+		EconomyManager.loadData(new File(pluginPath, "economy.json"));
+		
 		initLanguage();
 		
 		new God();
@@ -80,11 +86,25 @@ public class RedfixPlugin extends JavaPlugin {
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommands();
-		RegisteredServiceProvider<Chat> rsp = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
+		RegisteredServiceProvider<Chat> rspC = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
 				Chat.class);
-		chat = rsp.getProvider();
+		vaultChat = rspC.getProvider();
 		
 		new ChatListener();
+		
+		vaultEconomy = new VaultEconomy();
+		RedfixPlugin.getInstance().getServer().getServicesManager().register(Economy.class, vaultEconomy, this,
+				ServicePriority.Normal);
+		
+	}
+	
+	@Override
+	public void onDisable() {
+		saveEco();
+	}
+	
+	public static void saveEco() {
+		EconomyManager.saveData(new File(pluginPath, "economy.json"));
 	}
 	
 	private void registerCommands() {
@@ -494,6 +514,57 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Playtime
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("playtime");
+			builder = builder.permission("redfix.command.playtime").argument(
+					OfflinePlayerArgument.optional("player")).handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				OfflinePlayer target;
+				try {
+					target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+				} catch (ClassCastException e) {
+					sendMessage(sender, "You are not a player");
+					return;
+				}
+				int playedTicks = target.getStatistic(Statistic.PLAY_ONE_MINUTE);
+				int seconds = playedTicks / 20;
+				int minutes = seconds / 60;
+				int hours = minutes / 60;
+				int days = hours / 24;
+				sendMessage(sender,
+						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
+								seconds % 60));
+			});
+			this.manager.command(builder);
+		}
+		//PlaytimeTop
+		{
+			Command.Builder<CommandSender> builder = this.manager.commandBuilder("playtimetop");
+			builder = builder.permission("redfix.command.playtimetop").handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				UUID uuid = null;
+				int time = Integer.MIN_VALUE;
+				for (OfflinePlayer offlinePlayer : Bukkit.getOfflinePlayers()) {
+					int t0 = offlinePlayer.getStatistic(Statistic.PLAY_ONE_MINUTE);
+					if (t0 > time) {
+						time = t0;
+						uuid = offlinePlayer.getUniqueId();
+					}
+				}
+				int playedTicks = time;
+				int seconds = playedTicks / 20;
+				int minutes = seconds / 60;
+				int hours = minutes / 60;
+				int days = hours / 24;
+				sendMessage(sender, String.format("Player: %s", Bukkit.getOfflinePlayer(uuid).getName()));
+				sendMessage(sender,
+						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
+								seconds % 60));
+			});
+			this.manager.command(builder);
+		}
+		
 		//Repair
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("repair");
@@ -786,6 +857,7 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Bal
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balance", "bal", "money");
 			builder = builder.senderType(Player.class).permission("redfix.command.balance").argument(
@@ -800,19 +872,24 @@ public class RedfixPlugin extends JavaPlugin {
 			this.manager.command(builder);
 		}
 		
+		//Baltop
 		{
 			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balancetop", "baltop");
 			builder = builder.senderType(Player.class).permission("redfix.command.balance").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				final double[] value = {Double.MIN_VALUE};
-				final UUID[] uuid = {null};
-				EconomyManager.getAll().forEach((uuid0, value0) -> {
-					if (value0 > value[0]) {
-						value[0] = value0;
-						uuid[0] = uuid0;
+				double value = Double.MIN_VALUE;
+				UUID uuid = null;
+				for (Map.Entry<UUID, Double> e : EconomyManager.getAll().entrySet()) {
+					if (e.getValue() > value) {
+						value = e.getValue();
+						uuid = e.getKey();
 					}
-				});
-				sendMessage(player, "§cPlayer: " + Bukkit.getOfflinePlayer(uuid[0]).getName());
+				}
+				if (uuid == null) {
+					sendMessage(player, "No Money registered so far");
+					return;
+				}
+				sendMessage(player, "§6Player: " + Bukkit.getOfflinePlayer(uuid).getName());
 				sendMessage(player, "§aBalance: " + value + getConfig().getString("economy.symbol", "$"));
 			});
 			this.manager.command(builder);
@@ -821,14 +898,7 @@ public class RedfixPlugin extends JavaPlugin {
 		//Economy
 		{
 			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("economy", "eco");
-			/*Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
-					Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
-				CommandSender sender = commandContext.getSender();
-				Player target = commandContext.get("player");
-				sender.sendMessage("You jailed " + target.getName());
-				Player player = commandContext.get("player");
-				player.sendMessage("Jailed XD");
-			});*/
+			
 			Command.Builder<CommandSender> setBuilder = topBuilder.literal("set").permission(
 					Permission.of("redfix.command.economy.set")).argument(OfflinePlayerArgument.of("player")).argument(
 					DoubleArgument.of("amount")).handler(commandContext -> {
@@ -838,9 +908,45 @@ public class RedfixPlugin extends JavaPlugin {
 				EconomyManager.setMoney(player.getUniqueId(), amount);
 				sendMessage(sender, "Set money of player " + player.getName() + " to " + amount + getConfig().getString(
 						"economy.symbol", "$"));
+				saveEco();
 			});
+			Command.Builder<CommandSender> giveBuilder = topBuilder.literal("give").permission(
+					Permission.of("redfix.command.economy.give")).argument(OfflinePlayerArgument.of("player")).argument(
+					DoubleArgument.of("amount")).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				OfflinePlayer player = commandContext.get("player");
+				double amount = commandContext.get("amount");
+				EconomyManager.addMoney(player.getUniqueId(), amount);
+				sendMessage(sender,
+						"Gave player " + player.getName() + " " + amount + getConfig().getString("economy.symbol",
+								"$"));
+				saveEco();
+			});
+			Command.Builder<CommandSender> takeBuilder = topBuilder.literal("take").permission(
+					Permission.of("redfix.command.economy.take")).argument(OfflinePlayerArgument.of("player")).argument(
+					DoubleArgument.of("amount")).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				OfflinePlayer player = commandContext.get("player");
+				double amount = commandContext.get("amount");
+				EconomyManager.addMoney(player.getUniqueId(), -amount);
+				sendMessage(sender, "Took " + +amount + getConfig().getString("economy.symbol",
+						"$") + " from player " + player.getName());
+				saveEco();
+			});
+			Command.Builder<CommandSender> resetBuilder = topBuilder.literal("reset").permission(
+					Permission.of("redfix.command.economy.reset")).argument(OfflinePlayerArgument.of("player")).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						OfflinePlayer player = commandContext.get("player");
+						EconomyManager.setMoney(player.getUniqueId(), getConfig().getDouble("economy.startMoney", 100));
+						sendMessage(sender, "Reset player's " + player.getName() + " money");
+						saveEco();
+					});
 			
 			this.manager.command(setBuilder);
+			this.manager.command(giveBuilder);
+			this.manager.command(takeBuilder);
+			this.manager.command(resetBuilder);
 		}
 		
 		//Pay
@@ -851,15 +957,17 @@ public class RedfixPlugin extends JavaPlugin {
 						Player sender = (Player) commandContext.getSender();
 						OfflinePlayer player = commandContext.get("player");
 						double amount = commandContext.get("amount");
-						EconomyManager.setMoney(player.getUniqueId(), amount);
 						if (EconomyManager.getMoney(sender.getUniqueId()) < amount) {
-							sendMessage(sender, "You have not enough money");
+							sendMessage(sender, "§4You have not enough money");
 							return;
 						}
-						sendMessage(sender, "Payed " + amount + getConfig().getString("economy.symbol",
-								"$") + " to " + player.getName());
-						sendMessage(sender, "You got " + amount + getConfig().getString("economy.symbol",
-								"$") + " from " + sender.getDisplayName());
+						EconomyManager.addMoney(player.getUniqueId(), amount);
+						EconomyManager.addMoney(sender.getUniqueId(), -amount);
+						sendMessage(sender, "§bPayed §a" + amount + getConfig().getString("economy.symbol",
+								"$") + "§b to §6" + player.getName());
+						sendMessage(sender, "§bYou got §a" + amount + getConfig().getString("economy.symbol",
+								"$") + "§b from §6" + sender.getDisplayName());
+						saveEco();
 					});
 			
 			this.manager.command(builder);

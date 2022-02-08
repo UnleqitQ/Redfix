@@ -7,3 +7,7 @@ chat:
 
 economy:
   symbol: "$"
+  name:
+    singular: "Dollar"
+    plural: "Dollars"
+  startMoney: 100

@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import de.redfox.redfix.RedfixPlugin;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,7 +25,7 @@ public class EconomyManager {
 	
 	public static double getMoney(UUID player) {
 		if (!money.containsKey(player))
-			money.put(player, 0.);
+			money.put(player, RedfixPlugin.getInstance().getConfig().getDouble("economy.startMoney", 100));
 		return money.get(player);
 	}
 	
@@ -51,16 +52,19 @@ public class EconomyManager {
 			FileInputStream fis = new FileInputStream(file);
 			array = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonArray();
 			fis.close();
-		} catch (IOException e) {
+		} catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
-		array.forEach(e -> {
-			JsonObject object = e.getAsJsonObject();
-			UUID player = UUID.fromString(object.get("player").getAsString());
-			double amount = object.get("money").getAsDouble();
-			setMoney(player, amount);
-		});
+		try {
+			array.forEach(e -> {
+				JsonObject object = e.getAsJsonObject();
+				UUID player = UUID.fromString(object.get("player").getAsString());
+				double amount = object.get("money").getAsDouble();
+				setMoney(player, amount);
+			});
+		} catch (Exception ignored) {
+		}
 	}
 	
 	public static void saveData(File file) {

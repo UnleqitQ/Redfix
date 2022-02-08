@@ -21,8 +21,8 @@ public class ChatListener implements Listener {
 		String message = event.getMessage();
 		Player player = event.getPlayer();
 		message = message.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
-		String name = (RedfixPlugin.getInstance().chat.getPlayerPrefix(
-				player) + player.getCustomName() + RedfixPlugin.getInstance().chat.getPlayerSuffix(player)).replaceAll(
+		String name = (RedfixPlugin.getInstance().vaultChat.getPlayerPrefix(
+				player) + player.getCustomName() + RedfixPlugin.getInstance().vaultChat.getPlayerSuffix(player)).replaceAll(
 				"&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
 		if (event.getMessage().startsWith("!")) {
 			String msg = name + "§7 >> §r" + message.substring(1);
