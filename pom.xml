@@ -16,6 +16,16 @@
     <build>
         <finalName>${project.name}_v${project.version}</finalName>
         <plugins>
+            <!--plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+            </plugin-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -25,31 +35,9 @@
                     <target>16</target>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.3.0</version>
-
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <id>make</id>
-                    </execution>
-                </executions>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-
-                    <outputDirectory>C:/Users/quent.DESKTOP-L0VD1RP/Downloads/server/plugins</outputDirectory>
-                </configuration>
-            </plugin>
         </plugins>
         <defaultGoal>clean package</defaultGoal>
-        <sourceDirectory>${basedir}/src/main/java</sourceDirectory>
+        <sourceDirectory>src/main/java</sourceDirectory>
         <!--<directory>G:/Downloads 11/server18/plugins</directory>-->
         <!--<outputDirectory>G:/Downloads 11/server18/plugins</outputDirectory>-->
 
@@ -85,18 +73,25 @@
     </repositories>
 
     <dependencies>
-        <dependency>
+        <!--dependency>
             <groupId>cloud.commandframework</groupId>
             <artifactId>cloud-paper</artifactId>
             <version>1.6.1</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>cloud.commandframework</groupId>
             <artifactId>cloud-annotations</artifactId>
             <version>1.6.1</version>
             <scope>provided</scope>
+        </dependency-->
+        <dependency>
+            <groupId>me.unleqitq</groupId>
+            <artifactId>CommandFramework</artifactId>
+            <version>1.0.0</version>
+            <scope>compile</scope>
         </dependency>
+
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>

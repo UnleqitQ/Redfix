@@ -1,28 +1,20 @@
 package de.redfox.redfix;
 
-import cloud.commandframework.ArgumentDescription;
-import cloud.commandframework.Command;
-import cloud.commandframework.CommandTree;
-import cloud.commandframework.arguments.flags.CommandFlag;
-import cloud.commandframework.arguments.standard.*;
-import cloud.commandframework.bukkit.parsers.EnchantmentArgument;
-import cloud.commandframework.bukkit.parsers.MaterialArgument;
-import cloud.commandframework.bukkit.parsers.OfflinePlayerArgument;
-import cloud.commandframework.bukkit.parsers.PlayerArgument;
-import cloud.commandframework.execution.AsynchronousCommandExecutionCoordinator;
-import cloud.commandframework.execution.CommandExecutionCoordinator;
-import cloud.commandframework.paper.PaperCommandManager;
-import cloud.commandframework.permission.Permission;
 import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
 import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.economy.VaultEconomy;
+import de.redfox.redfix.modules.ArmorStandArms;
 import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
+import me.unleqitq.commandframework.CommandManager;
+import me.unleqitq.commandframework.building.argument.*;
+import me.unleqitq.commandframework.building.command.FrameworkCommand;
+import me.unleqitq.commandframework.building.flag.FrameworkFlag;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
@@ -32,8 +24,8 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -48,8 +40,10 @@ import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class RedfixPlugin extends JavaPlugin {
 	
@@ -58,16 +52,15 @@ public class RedfixPlugin extends JavaPlugin {
 	public static final String pluginPath = "plugins/Redfix";
 	public Chat vaultChat;
 	public VaultEconomy vaultEconomy;
+	public static Map<UUID, Long> muted = new HashMap<>();
 	
 	public RedfixPlugin() {
 		instance = this;
 		new File(pluginPath).mkdirs();
 	}
 	
+	public static Map<UUID, UUID> lastMessaged = new HashMap<>();
 	
-	private PaperCommandManager<CommandSender> manager;
-	Function<CommandTree<CommandSender>, CommandExecutionCoordinator<CommandSender>> executionCoordinatorFunction = AsynchronousCommandExecutionCoordinator.<CommandSender>newBuilder().build();
-	Function<CommandSender, CommandSender> mapperFunction = Function.identity();
 	
 	@Override
 	public void onEnable() {
@@ -83,18 +76,21 @@ public class RedfixPlugin extends JavaPlugin {
 		new God();
 		new JailHandler();
 		
+		Bukkit.getScheduler().runTaskTimer(this, new ArmorStandArms()::updateArmorStands, 20, 20);
+		
 		commandSpy = new CommandSpy();
 		commandSpy.load();
 		registerCommands();
 		RegisteredServiceProvider<Chat> rspC = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
 				Chat.class);
-		vaultChat = rspC.getProvider();
-		
+		if (rspC != null) {
+			vaultChat = rspC.getProvider();
+			
+		}
 		new ChatListener();
 		
 		vaultEconomy = new VaultEconomy();
-		RedfixPlugin.getInstance().getServer().getServicesManager().register(Economy.class, vaultEconomy, this,
-				ServicePriority.Normal);
+		getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Normal);
 		
 	}
 	
@@ -108,17 +104,10 @@ public class RedfixPlugin extends JavaPlugin {
 	}
 	
 	private void registerCommands() {
-		try {
-			manager = new PaperCommandManager<>(this, executionCoordinatorFunction, mapperFunction, mapperFunction);
-		} catch (Exception e) {
-			this.getLogger().severe("Failed to initialize the command this.manager");
-			this.getServer().getPluginManager().disablePlugin(this);
-			e.printStackTrace();
-		}
 		
 		//Jail
 		{
-			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("jail");
+			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder("jail");
 			/*Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
 					Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
@@ -127,117 +116,115 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = commandContext.get("player");
 				player.sendMessage("Jailed XD");
 			});*/
-			Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
-					Player.class).permission(Permission.of("redfix.command.jail.create")).argument(
-					StringArgument.of("name"), ArgumentDescription.of("The name of the jail to create")).handler(
-					commandContext -> {
-						Player sender = (Player) commandContext.getSender();
-						if (JailHandler.jails.containsKey(commandContext.get("name"))) {
-							sendMessage(sender, "A jail with this name already exists");
-							return;
-						}
-						Jail jail = new Jail(commandContext.get("name"), sender.getLocation().getBlock().getLocation());
-						JailHandler.jails.put(jail.name, jail);
-						sendMessage(sender, "Created jail \"" + jail.name + "\"");
-					});
+			FrameworkCommand.Builder<Player> createBuilder = topBuilder.subPlayerCommand("create").permission(
+					"redfix.command.jail.create").argument(StringArgument.of("name"),
+					"The name of the jail to create").handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				if (JailHandler.jails.containsKey(commandContext.getArgument("name"))) {
+					sendMessage(sender, "A jail with this name already exists");
+					return;
+				}
+				Jail jail = new Jail(commandContext.getArgument("name"), sender.getLocation().getBlock().getLocation());
+				JailHandler.jails.put(jail.name, jail);
+				sendMessage(sender, "Created jail \"" + jail.name + "\"");
+			});
 			
-			StringArgument.Builder jailArgument = StringArgument.newBuilder("name").withSuggestionsProvider(
+			StringArgument.Builder jailArgument = (StringArgument.Builder) StringArgument.of("name").tabComplete(
 					(context, arg) -> JailHandler.jails.keySet().stream().filter(
 							s -> s.toLowerCase().contains(arg.toLowerCase())).toList());
 			
-			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").permission(
-					"redfix.command.jail.remove").argument(jailArgument,
-					ArgumentDescription.of("The name of the jail to remove")).handler(commandContext -> {
-				CommandSender sender = (CommandSender) commandContext.getSender();
-				if (!JailHandler.jails.containsKey(commandContext.get("name"))) {
-					sendMessage(sender, "This jail does not exist");
-					return;
-				}
-				JailHandler.jails.remove(commandContext.get("name"));
-				sendMessage(sender, "Removed jail \"" + commandContext.get("name") + "\"");
-			});
+			FrameworkCommand.Builder<CommandSender> removeBuilder = topBuilder.subCommand("remove").permission(
+					"redfix.command.jail.remove").argument(jailArgument, "The name of the jail to remove").handler(
+					commandContext -> {
+						CommandSender sender = (CommandSender) commandContext.getSender();
+						if (!JailHandler.jails.containsKey(commandContext.getArgument("name"))) {
+							sendMessage(sender, "This jail does not exist");
+							return;
+						}
+						JailHandler.jails.remove(commandContext.getArgument("name"));
+						sendMessage(sender, "Removed jail \"" + commandContext.getArgument("name") + "\"");
+					});
 			
-			Command.Builder<CommandSender> jailBuilder = topBuilder.literal("jail").permission(
-					"redfix.command.jail.jail").argument(PlayerArgument.of("player"),
-					ArgumentDescription.of("The player to jail")).argument(jailArgument,
-					ArgumentDescription.of("The name of the jail to remove")).argument(
-					IntegerArgument.newBuilder("duration").withMin(1).withMax(60 * 60 * 24).asOptional(),
-					ArgumentDescription.of("Duration to jail the player in seconds")).handler(commandContext -> {
-				CommandSender sender = (CommandSender) commandContext.getSender();
-				Player player = (Player) commandContext.get("player");
-				String name = (String) commandContext.get("name");
-				int duration = (int) commandContext.getOptional("duration").orElseGet(() -> -1);
-				if (duration == -1 && !sender.hasPermission("redfix.jail.jail.permanent")) {
-					sendMessage(sender, "I'm sorry, but you don't have the permission to jail permanently");
-					return;
-				}
-				if (!JailHandler.jails.containsKey(name)) {
-					sendMessage(sender, "This jail does not exist");
-					return;
-				}
-				
-				JailedPlayer jp = new JailedPlayer(player.getUniqueId(), name, duration);
-				JailHandler.jailedPlayers.put(player.getUniqueId(), jp);
-				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.teleport(jp.getJail().location));
-				sendMessage(sender,
-						"You jailed " + player.getName() + ((duration != -1) ? " for " + duration + " seconds" : ""));
-				sendMessage(player, "You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
-			});
+			FrameworkCommand.Builder<CommandSender> jailBuilder = topBuilder.subCommand("jail").permission(
+					"redfix.command.jail.jail").argument(PlayerArgument.of("player"), "The player to jail").argument(
+					jailArgument, "The name of the jail to remove").argument(
+					IntegerArgument.of("duration").optional(-1), "Duration to jail the player in seconds").handler(
+					commandContext -> {
+						CommandSender sender = commandContext.getSender();
+						Player player = commandContext.getArgument("player");
+						String name = commandContext.getArgument("name");
+						int duration = commandContext.getArgument("duration");
+						if (duration == -1 && !sender.hasPermission("redfix.jail.jail.permanent")) {
+							sendMessage(sender, "I'm sorry, but you don't have the permission to jail permanently");
+							return;
+						}
+						if (!JailHandler.jails.containsKey(name)) {
+							sendMessage(sender, "This jail does not exist");
+							return;
+						}
+						
+						JailedPlayer jp = new JailedPlayer(player.getUniqueId(), name, duration);
+						JailHandler.jailedPlayers.put(player.getUniqueId(), jp);
+						Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(),
+								() -> player.teleport(jp.getJail().location));
+						sendMessage(sender,
+								"You jailed " + player.getName() + ((duration != -1) ? " for " + duration + " seconds" : ""));
+						sendMessage(player,
+								"You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
+					});
 			
-			Command.Builder<CommandSender> freeBuilder = topBuilder.literal("unjail").permission(
-					"redfix.command.jail.unjail").argument(PlayerArgument.of("player"),
-					ArgumentDescription.of("The player to unjail")).handler(commandContext -> {
-				CommandSender sender = commandContext.getSender();
-				Player player = commandContext.get("player");
-				if (!JailHandler.jailedPlayers.containsKey(player.getUniqueId())) {
-					sendMessage(sender, "This player is not jailed");
-					return;
-				}
-				
-				sendMessage(sender, "You freed " + player.getName());
-				JailHandler.jailedPlayers.remove(player.getUniqueId());
-				sendMessage(player, "You got freed");
-			});
+			FrameworkCommand.Builder<CommandSender> freeBuilder = topBuilder.subCommand("unjail").permission(
+					"redfix.command.jail.unjail").argument(PlayerArgument.of("player"), "The player to unjail").handler(
+					commandContext -> {
+						CommandSender sender = commandContext.getSender();
+						Player player = commandContext.getArgument("player");
+						if (!JailHandler.jailedPlayers.containsKey(player.getUniqueId())) {
+							sendMessage(sender, "This player is not jailed");
+							return;
+						}
+						
+						sendMessage(sender, "You freed " + player.getName());
+						JailHandler.jailedPlayers.remove(player.getUniqueId());
+						sendMessage(player, "You got freed");
+					});
 			
-			this.manager.command(createBuilder);
-			this.manager.command(removeBuilder);
-			this.manager.command(jailBuilder);
-			this.manager.command(freeBuilder);
+			CommandManager.register(createBuilder);
+			CommandManager.register(removeBuilder);
+			CommandManager.register(jailBuilder);
+			CommandManager.register(freeBuilder);
 		}
 		
 		//God
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("god");
-			builder = builder.senderType(Player.class).permission("redfix.command.god").flag(
-							CommandFlag.newBuilder("silent").withDescription(
-									ArgumentDescription.of("You get damage but the amount is set to zero")).withAliases(
-									"s").build()).flag(CommandFlag.newBuilder("notarget").withDescription(
-							ArgumentDescription.of("Mobs don't target you")).withAliases("t").build()).argument(
-							PlayerArgument.optional("player"), ArgumentDescription.of("player"))
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("god");
+			builder = builder.permission("redfix.command.god").flag(
+							FrameworkFlag.of("silent").setDescription("You get damage but the amount is set to zero")).flag(
+							FrameworkFlag.of("notarget").setDescription("Mobs don't target you")).argument(
+							PlayerArgument.of("player").optional(), "player")
 					//.argument(PlayerArgument.of("player"))
 					.handler(commandContext -> {
 						Player player = (Player) commandContext.getSender();
-						Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+						Player target = commandContext.getOrDefault("player", player);
 						if (God.players.containsKey(target.getUniqueId())) {
 							God.players.remove(target.getUniqueId());
 							sendMessage(player, "Disabled God");
 						}
 						else {
-							God.players.put(target.getUniqueId(), new Boolean[]{commandContext.flags().contains(
-									"silent"), commandContext.flags().contains("notarget")});
+							God.players.put(target.getUniqueId(),
+									new Boolean[]{commandContext.getFlag("silent"), commandContext.getFlag(
+											"notarget")});
 							sendMessage(player, "Enabled God");
 						}
 					});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Heal
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("heal");
-			builder = builder.senderType(Player.class).permission("redfix.command.heal").flag(
-					CommandFlag.newBuilder("particle").withAliases("p").withDescription(
-							ArgumentDescription.of("Spawn a heart particle"))).argument(
-					PlayerArgument.optional("player"), ArgumentDescription.of("player")).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("heal");
+			builder = builder.permission("redfix.command.heal").flag(
+					FrameworkFlag.of("particle").setDescription("Spawn a heart particle")).argument(
+					PlayerArgument.of("player").optional(null), "player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 				target.setHealth(
@@ -246,29 +233,29 @@ public class RedfixPlugin extends JavaPlugin {
 				target.setSaturation(20);
 				target.setFoodLevel(20);
 				sendMessage(target, "You got healed");
-				if (commandContext.flags().contains("particle")) {
+				if (commandContext.getFlag("particle")) {
 					target.getWorld().spawnParticle(Particle.HEART, target.getLocation().clone().add(0, 1.5, 0), 1);
 				}
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Fly
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("fly");
-			builder = builder.senderType(Player.class).permission("redfix.command.fly").argument(
-					PlayerArgument.optional("player"), ArgumentDescription.of("player")).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("fly");
+			builder = builder.permission("redfix.command.fly").argument(PlayerArgument.of("player").optional(),
+					"player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				Player target = (Player) commandContext.getOptional("player").orElse(player);
+				Player target = commandContext.getOrDefault("player", player);
 				target.setAllowFlight(!target.getAllowFlight());
 				sendMessage(player, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Gm
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("gamemode", "gm");
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("gamemode", "gm");
 			Map<String, GameMode> values = new HashMap<>();
 			values.put("0", GameMode.SURVIVAL);
 			values.put("survival", GameMode.SURVIVAL);
@@ -287,7 +274,7 @@ public class RedfixPlugin extends JavaPlugin {
 			values.put("spectator", GameMode.SPECTATOR);
 			values.put("sp", GameMode.SPECTATOR);
 			
-			StringArgument.Builder gmArgument = StringArgument.newBuilder("gamemode").withSuggestionsProvider(
+			StringArgument.Builder gmArgument = (StringArgument.Builder) StringArgument.of("gamemode").tabComplete(
 					(context, arg) -> {
 						List<String> l = new ArrayList<>();
 						Arrays.stream(GameMode.values()).filter(
@@ -296,9 +283,8 @@ public class RedfixPlugin extends JavaPlugin {
 						return l;
 					});
 			
-			builder = builder.senderType(Player.class).permission("redfix.command.gamemode").argument(gmArgument,
-					ArgumentDescription.of("gamemode")).argument(PlayerArgument.optional("player"),
-					ArgumentDescription.of("player")).handler(commandContext -> {
+			builder = builder.permission("redfix.command.gamemode").argument(gmArgument, "gamemode").argument(
+					PlayerArgument.of("player").optional(null), "player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
 				GameMode gameMode = values.get(commandContext.get("gamemode"));
@@ -311,40 +297,38 @@ public class RedfixPlugin extends JavaPlugin {
 						"Switched GameMode to " + gameMode.name().substring(0, 1) + gameMode.name().substring(
 								1).toLowerCase());
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//PTime
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("ptime");
-			builder = builder.senderType(Player.class).permission("redfix.command.ptime").flag(
-					CommandFlag.newBuilder("relative").withAliases("r").withDescription(
-							ArgumentDescription.of("makes the player time relative"))).argument(
-					IntegerArgument.optional("time"), ArgumentDescription.of("Time, if none given resets")).handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						if (commandContext.contains("time")) {
-							int time = (int) commandContext.getOptional("time").orElse(0);
-							player.setPlayerTime(time, commandContext.flags().contains("relative"));
-							sendMessage(player, "Set player time");
-						}
-						else {
-							player.resetPlayerTime();
-							sendMessage(player, "Reset player time");
-						}
-					});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("ptime");
+			builder = builder.permission("redfix.command.ptime").flag(
+					FrameworkFlag.of("relative").setDescription("makes the player time relative")).argument(
+					IntegerArgument.of("time").optional(), "Time, if none given resets").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				if (commandContext.contains("time")) {
+					int time = (int) commandContext.getOptional("time").orElse(0);
+					player.setPlayerTime(time, commandContext.getFlag("relative"));
+					sendMessage(player, "Set player time");
+				}
+				else {
+					player.resetPlayerTime();
+					sendMessage(player, "Reset player time");
+				}
+			});
+			CommandManager.register(builder);
 		}
 		
 		//PWeather
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("pweather");
-			builder = builder.senderType(Player.class).permission("redfix.command.pweather").argument(
-					EnumArgument.optional(WeatherType.class, "weather"),
-					ArgumentDescription.of("Weather type, if none given resets")).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("pweather");
+			builder = builder.permission("redfix.command.pweather").argument(
+					EnumArgument.of("weather", WeatherType.class).optional(null),
+					"Weather type, if none given resets").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				if (commandContext.contains("weather")) {
-					WeatherType type = (WeatherType) commandContext.getOptional("weather").orElse(WeatherType.CLEAR);
+					WeatherType type = (WeatherType) commandContext.getArgument("weather");
 					player.setPlayerWeather(type);
 					sendMessage(player, "Set player weather");
 				}
@@ -353,27 +337,27 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Reset player weather");
 				}
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Time
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("time", "rftime");
-			builder = builder.senderType(Player.class).permission("redfix.command.time").argument(
-					IntegerArgument.of("time"), ArgumentDescription.of("Time")).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				int time = commandContext.get("time");
-				player.getWorld().setFullTime(time);
-				sendMessage(player, "Set time");
-			});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("time", "rftime");
+			builder = builder.permission("redfix.command.time").argument(IntegerArgument.of("time"), "Time").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						int time = commandContext.get("time");
+						player.getWorld().setFullTime(time);
+						sendMessage(player, "Set time");
+					});
+			CommandManager.register(builder);
 		}
 		
 		//Wspeed
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("walkspeed", "wspeed");
-			builder = builder.senderType(Player.class).permission("redfix.command.walkspeed").argument(
-					FloatArgument.of("speed"), ArgumentDescription.of("Walking speed")).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("walkspeed", "wspeed");
+			builder = builder.permission("redfix.command.walkspeed").argument(FloatArgument.of("speed"),
+					"Walking speed").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				float speed = commandContext.get("speed");
 				AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
@@ -384,29 +368,28 @@ public class RedfixPlugin extends JavaPlugin {
 				player.setWalkSpeed(0.2f);
 				sendMessage(player, "Set walk speed to " + speed);
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Fspeed
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("flyspeed", "fspeed");
-			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
-			builder = builder.senderType(Player.class).permission("redfix.command.flyspeed").argument(speedArg,
-					ArgumentDescription.of("Flying speed")).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				float speed = (float) commandContext.get("speed");
-				player.setFlySpeed(speed / 10);
-				sendMessage(player, "Set fly speed to " + speed);
-			});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("flyspeed", "fspeed");
+			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
+			builder = builder.permission("redfix.command.flyspeed").argument(speedArg, "Flying speed").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						float speed = (float) commandContext.get("speed");
+						player.setFlySpeed(speed / 10);
+						sendMessage(player, "Set fly speed to " + speed);
+					});
+			CommandManager.register(builder);
 		}
 		
 		//Speed
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("speed");
-			FloatArgument.Builder speedArg = FloatArgument.newBuilder("speed").withMin(0).withMax(10);
-			builder = builder.senderType(Player.class).permission("redfix.command.speed").argument(speedArg,
-					ArgumentDescription.of("Speed")).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("speed");
+			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
+			builder = builder.permission("redfix.command.speed").argument(speedArg, "Speed").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				float speed = (float) commandContext.get("speed");
 				if (player.isFlying()) {
@@ -423,40 +406,37 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Set walk speed to " + speed);
 				}
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Distance
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("distance");
-			builder = builder.senderType(Player.class).permission("redfix.command.distance").argument(
-					PlayerArgument.of("player"), ArgumentDescription.of("Player to measure distance to")).handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						Player target = commandContext.get("player");
-						if (!player.getWorld().getUID().equals(target.getWorld().getUID())) {
-							sendMessage(player, "Target is in a different world");
-							return;
-						}
-						Location l1 = player.getLocation();
-						Location l2 = target.getLocation();
-						Vector v1 = l1.toVector();
-						Vector v2 = l2.toVector();
-						Vector d = v2.subtract(v1);
-						sendMessage(player, String.format("Measuring Distance to Player %s", target.getName()));
-						sendMessage(player, String.format("Distance: %3.02f", d.length()));
-						sendMessage(player,
-								String.format("Difference: %3.02f %3.02f %3.02f", d.getX(), d.getY(), d.getZ()));
-					});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("distance");
+			builder = builder.permission("redfix.command.distance").argument(PlayerArgument.of("player"),
+					"Player to measure distance to").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Player target = commandContext.get("player");
+				if (!player.getWorld().getUID().equals(target.getWorld().getUID())) {
+					sendMessage(player, "Target is in a different world");
+					return;
+				}
+				Location l1 = player.getLocation();
+				Location l2 = target.getLocation();
+				Vector v1 = l1.toVector();
+				Vector v2 = l2.toVector();
+				Vector d = v2.subtract(v1);
+				sendMessage(player, String.format("Measuring Distance to Player %s", target.getName()));
+				sendMessage(player, String.format("Distance: %3.02f", d.length()));
+				sendMessage(player, String.format("Difference: %3.02f %3.02f %3.02f", d.getX(), d.getY(), d.getZ()));
+			});
+			CommandManager.register(builder);
 		}
 		
 		//Enchant
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("enchant", "rfenchant");
-			builder = builder.senderType(Player.class).permission("redfix.command.enchant").argument(
-					EnchantmentArgument.of("enchantment"), ArgumentDescription.of("The Enchantment to apply")).argument(
-					IntegerArgument.of("level"), ArgumentDescription.of("The Level to apply")).handler(
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("enchant", "rfenchant");
+			builder = builder.permission("redfix.command.enchant").argument(EnchantmentArgument.of("enchantment"),
+					"The Enchantment to apply").argument(IntegerArgument.of("level"), "The Level to apply").handler(
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
 						Enchantment enchantment = commandContext.get("enchantment");
@@ -490,35 +470,33 @@ public class RedfixPlugin extends JavaPlugin {
 						} catch (Exception ignored) {
 						}
 					});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Give
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("i", "give", "item");
-			builder = builder.senderType(Player.class).permission("redfix.command.give").argument(
-					MaterialArgument.of("material"), ArgumentDescription.of("The Item")).argument(
-					IntegerArgument.optional("count", 1), ArgumentDescription.of("The Count")).handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						Material material = commandContext.get("material");
-						int count = commandContext.get("count");
-						try {
-							for (int i = 0; i < count / material.getMaxStackSize(); i++) {
-								player.getInventory().addItem(new ItemStack(material, material.getMaxStackSize()));
-							}
-							player.getInventory().addItem(new ItemStack(material, count % material.getMaxStackSize()));
-						} catch (Exception ignored) {
-						}
-					});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("i", "give", "item");
+			builder = builder.permission("redfix.command.give").argument(MaterialArgument.of("material"),
+					"The Item").argument(IntegerArgument.optional("count", 1), "The Count").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Material material = commandContext.get("material");
+				int count = commandContext.get("count");
+				try {
+					for (int i = 0; i < count / material.getMaxStackSize(); i++) {
+						player.getInventory().addItem(new ItemStack(material, material.getMaxStackSize()));
+					}
+					player.getInventory().addItem(new ItemStack(material, count % material.getMaxStackSize()));
+				} catch (Exception ignored) {
+				}
+			});
+			CommandManager.register(builder);
 		}
 		
 		//Playtime
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("playtime");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("playtime");
 			builder = builder.permission("redfix.command.playtime").argument(
-					OfflinePlayerArgument.optional("player")).handler(commandContext -> {
+					OfflinePlayerArgument.of("player").optional()).handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
 				OfflinePlayer target;
 				try {
@@ -536,11 +514,11 @@ public class RedfixPlugin extends JavaPlugin {
 						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
 								seconds % 60));
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		//PlaytimeTop
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("playtimetop");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("playtimetop");
 			builder = builder.permission("redfix.command.playtimetop").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
 				UUID uuid = null;
@@ -562,17 +540,16 @@ public class RedfixPlugin extends JavaPlugin {
 						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
 								seconds % 60));
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Repair
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("repair");
-			builder = builder.senderType(Player.class).permission("redfix.command.repair").flag(
-					CommandFlag.newBuilder("all").withAliases("a").withDescription(
-							ArgumentDescription.of("Repairs all your items"))).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("repair");
+			builder = builder.permission("redfix.command.repair").flag(
+					FrameworkFlag.of("all").setDescription("Repairs all your items")).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				if (commandContext.flags().contains("all")) {
+				if (commandContext.getFlag("all")) {
 					try {
 						for (int i = 0; i < player.getInventory().getSize(); i++) {
 							ItemStack item = player.getInventory().getItem(i);
@@ -636,13 +613,42 @@ public class RedfixPlugin extends JavaPlugin {
 					}
 				}
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Unbreakable
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("unbreakable");
-			builder = builder.senderType(Player.class).permission("redfix.command.unbreakable").handler(
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("unbreakable");
+			builder = builder.permission("redfix.command.unbreakable").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				try {
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getType() == Material.AIR)
+						item = player.getInventory().getItemInOffHand();
+					if (item.getType() == Material.AIR) {
+						sendMessage(player, "You are not holding any item");
+						return;
+					}
+					ItemMeta meta = item.getItemMeta();
+					meta.setUnbreakable(true);
+					item.setItemMeta(meta);
+					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+						player.getInventory().setItemInMainHand(item);
+					}
+					else {
+						player.getInventory().setItemInOffHand(item);
+					}
+					sendMessage(player, "Made " + item.getType() + " unbreakable");
+				} catch (Exception ignored) {
+				}
+			});
+			CommandManager.register(builder);
+		}
+		
+		//AddLore
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("addlore");
+			builder = builder.permission("redfix.command.addlore").argument(StringArgument.of("lore")).handler(
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
 						try {
@@ -654,7 +660,10 @@ public class RedfixPlugin extends JavaPlugin {
 								return;
 							}
 							ItemMeta meta = item.getItemMeta();
-							meta.setUnbreakable(true);
+							List<String> lore = new ArrayList<>();
+							lore.addAll(Objects.requireNonNullElse(meta.getLore(), new ArrayList<>()));
+							lore.add(commandContext.get("lore"));
+							meta.setLore(lore);
 							item.setItemMeta(meta);
 							if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
 								player.getInventory().setItemInMainHand(item);
@@ -662,51 +671,102 @@ public class RedfixPlugin extends JavaPlugin {
 							else {
 								player.getInventory().setItemInOffHand(item);
 							}
-							sendMessage(player, "Made " + item.getType() + " unbreakable");
+							sendMessage(player, "Added lore to " + item.getType());
 						} catch (Exception ignored) {
 						}
 					});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
-		//AddLore
+		//Craft
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("addlore");
-			builder = builder.senderType(Player.class).permission("redfix.command.addlore").argument(
-					StringArgument.of("lore")).handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				try {
-					ItemStack item = player.getInventory().getItemInMainHand();
-					if (item.getType() == Material.AIR)
-						item = player.getInventory().getItemInOffHand();
-					if (item.getType() == Material.AIR) {
-						sendMessage(player, "You are not holding any item");
-						return;
-					}
-					ItemMeta meta = item.getItemMeta();
-					List<String> lore = new ArrayList<>();
-					lore.addAll(Objects.requireNonNullElse(meta.getLore(), new ArrayList<>()));
-					lore.add(commandContext.get("lore"));
-					meta.setLore(lore);
-					item.setItemMeta(meta);
-					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
-						player.getInventory().setItemInMainHand(item);
-					}
-					else {
-						player.getInventory().setItemInOffHand(item);
-					}
-					sendMessage(player, "Added lore to " + item.getType());
-				} catch (Exception ignored) {
-				}
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("craft");
+			builder = builder.permission("redfix.command.craft").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openWorkbench(null, true);
+				});
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
+		}
+		
+		//Anvil
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("anvil");
+			builder = builder.permission("redfix.command.anvil").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.ANVIL));
+				});
+			});
+			CommandManager.register(builder);
+		}
+		
+		//grindstone
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("grindstone");
+			builder = builder.permission("redfix.command.grindstone").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.GRINDSTONE));
+				});
+			});
+			CommandManager.register(builder);
+		}
+		
+		//stonecutter
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("stonecutter");
+			builder = builder.permission("redfix.command.stonecutter").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.STONECUTTER));
+				});
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Loom
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("loom");
+			builder = builder.permission("redfix.command.loom").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.LOOM));
+				});
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Cartography
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("cartography");
+			builder = builder.permission("redfix.command.cartography").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.CARTOGRAPHY));
+				});
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Smithing
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("smithing");
+			builder = builder.permission("redfix.command.smithing").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player player = (Player) commandContext.getSender();
+					player.openInventory(Bukkit.createInventory(player, InventoryType.SMITHING));
+				});
+			});
+			CommandManager.register(builder);
 		}
 		
 		//SpawnMob
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("spawnmob");
-			builder = builder.senderType(Player.class).permission("redfix.command.spawnmob").argument(
-					EnumArgument.of(EntityType.class, "entity")).argument(IntegerArgument.optional("count", 1)).handler(
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
+			builder = builder.permission("redfix.command.spawnmob").argument(
+					EnumArgument.of("entity", EntityType.class)).argument(IntegerArgument.optional("count", 1)).handler(
 					commandContext -> {
 						try {
 							Player player = (Player) commandContext.getSender();
@@ -730,111 +790,104 @@ public class RedfixPlugin extends JavaPlugin {
 						} catch (Exception ignored) {
 						}
 					});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//CommandSpy
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("commandspy");
-			builder = builder.senderType(Player.class).permission("redfix.command.commandspy").handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						if (commandSpy.players.contains(player.getUniqueId())) {
-							commandSpy.players.remove(player.getUniqueId());
-							player.sendMessage(CommandSpy.Messages.get(CommandSpy.Messages.PREFIX,
-									CommandSpy.Messages.COMMAND_DISABLE));
-						}
-						else {
-							if (!player.hasPermission("redfix.command.commandspy")) {
-								player.sendMessage(CommandSpy.Messages.get(
-										CommandSpy.Messages.PREFIX) + "I'm sorry, but you don't have the permission");
-								return;
-							}
-							commandSpy.players.add(player.getUniqueId());
-							player.sendMessage(CommandSpy.Messages.get(CommandSpy.Messages.PREFIX,
-									CommandSpy.Messages.COMMAND_ENABLE));
-						}
-						commandSpy.save();
-					});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("commandspy");
+			builder = builder.permission("redfix.command.commandspy").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				if (commandSpy.players.contains(player.getUniqueId())) {
+					commandSpy.players.remove(player.getUniqueId());
+					player.sendMessage(
+							CommandSpy.Messages.get(CommandSpy.Messages.PREFIX, CommandSpy.Messages.COMMAND_DISABLE));
+				}
+				else {
+					if (!player.hasPermission("redfix.command.commandspy")) {
+						player.sendMessage(CommandSpy.Messages.get(
+								CommandSpy.Messages.PREFIX) + "I'm sorry, but you don't have the permission");
+						return;
+					}
+					commandSpy.players.add(player.getUniqueId());
+					player.sendMessage(
+							CommandSpy.Messages.get(CommandSpy.Messages.PREFIX, CommandSpy.Messages.COMMAND_ENABLE));
+				}
+				commandSpy.save();
+			});
+			CommandManager.register(builder);
 		}
 		
 		//Effect
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("effect");
-			StringArgument.Builder effectArgument = StringArgument.newBuilder("effect").withSuggestionsProvider(
-					(context, arg) -> {
-						List<String> l = new ArrayList<>();
-						Arrays.stream(PotionEffectType.values()).filter(
-								et -> et.getName().replaceAll("\\W", "").toLowerCase().contains(
-										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.getName()));
-						return l;
-					});
-			builder = builder.senderType(Player.class).permission("redfix.command.effect").argument(
-					effectArgument).argument(IntegerArgument.optional("duration", 30)).argument(
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("effect");
+			builder = builder.permission("redfix.command.effect").argument(PlayerArgument.of("player")).argument(
+					EffectArgument.of("effect")).argument(IntegerArgument.optional("duration", 30)).argument(
 					IntegerArgument.optional("level", 0)).handler(commandContext -> {
 				try {
-					Player player = (Player) commandContext.getSender();
+					Player player = (Player) commandContext.get("player");
 					String effectName = ((String) commandContext.get("effect")).toLowerCase();
 					int duration = (int) commandContext.get("duration");
 					int level = (int) commandContext.get("level");
 					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.addPotionEffect(
-							new PotionEffect(PotionEffectType.getByName(effectName), duration * 20, level)));
+							new PotionEffect(PotionEffectType.getByKey(NamespacedKey.fromString(effectName)),
+									duration * 20, level)));
 				} catch (Exception ignored) {
 				}
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Item Attribute
 		{
-			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("itemattribute").permission(
-					"redfix.command.itemattribute");
-			StringArgument.Builder attributeArgument = StringArgument.newBuilder("attribute").withSuggestionsProvider(
-					(context, arg) -> {
-						List<String> l = new ArrayList<>();
-						Arrays.stream(Attribute.values()).filter(
-								et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
-										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
-						return l;
-					});
-			StringArgument.Builder operationArgument = StringArgument.newBuilder("operation").withSuggestionsProvider(
-					(context, arg) -> {
-						List<String> l = new ArrayList<>();
-						Arrays.stream(AttributeModifier.Operation.values()).filter(
-								et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
-										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
-						return l;
-					});
-			StringArgument.Builder slotArgument = (StringArgument.Builder) StringArgument.newBuilder(
-					"slot").withSuggestionsProvider((context, arg) -> {
+			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder(
+					"itemattribute").permission("redfix.command.itemattribute");
+			StringArgument.Builder attributeArgument = (StringArgument.Builder) StringArgument.of(
+					"attribute").tabComplete((context, arg) -> {
 				List<String> l = new ArrayList<>();
-				Arrays.stream(EquipmentSlot.values()).filter(
+				Arrays.stream(Attribute.values()).filter(et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
+						arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
+				return l;
+			});
+			StringArgument.Builder operationArgument = (StringArgument.Builder) StringArgument.of(
+					"operation").tabComplete((context, arg) -> {
+				List<String> l = new ArrayList<>();
+				Arrays.stream(AttributeModifier.Operation.values()).filter(
 						et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
 								arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
 				return l;
-			}).asOptionalWithDefault("");
-			StringArgument.Builder uuidArgument = (StringArgument.Builder) StringArgument.newBuilder(
-					"uuid").withSuggestionsProvider((context, arg) -> {
-				List<String> l = new ArrayList<>();
-				Player player = (Player) context.getSender();
-				ItemStack item = null;
-				if (player.getInventory().getItemInMainHand() == null || player.getInventory().getItemInMainHand().getType() == Material.AIR) {
-					if (player.getInventory().getItemInOffHand() == null || player.getInventory().getItemInOffHand().getType() == Material.AIR) {
-						return List.of("You are not holding any item");
-					}
-					else
-						item = player.getInventory().getItemInOffHand();
-				}
-				else
-					item = player.getInventory().getItemInMainHand();
-				ItemMeta meta = item.getItemMeta();
-				for (AttributeModifier modifier : meta.getAttributeModifiers().values()) {
-					l.add(modifier.getUniqueId().toString());
-				}
-				return l;
 			});
-			Command.Builder<CommandSender> addBuilder = topBuilder.literal("add").senderType(Player.class).argument(
+			StringArgument.Builder slotArgument = (StringArgument.Builder) StringArgument.of("slot").tabComplete(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						Arrays.stream(EquipmentSlot.values()).filter(
+								et -> et.name().replaceAll("\\W", "").toLowerCase().contains(
+										arg.replaceAll("\\W", "").toLowerCase())).forEach(et -> l.add(et.name()));
+						return l;
+					}).optional("");
+			StringArgument.Builder uuidArgument = (StringArgument.Builder) StringArgument.of("uuid").tabComplete(
+					(context, arg) -> {
+						List<String> l = new ArrayList<>();
+						Player player = (Player) context.getSender();
+						ItemStack item;
+						if (player.getInventory().getItemInMainHand().getType() == Material.AIR) {
+							if (player.getInventory().getItemInOffHand().getType() == Material.AIR) {
+								return List.of("You are not holding any item");
+							}
+							else
+								item = player.getInventory().getItemInOffHand();
+						}
+						else
+							item = player.getInventory().getItemInMainHand();
+						ItemMeta meta = item.getItemMeta();
+						if (!meta.hasAttributeModifiers())
+							return List.of();
+						for (AttributeModifier modifier : meta.getAttributeModifiers().values()) {
+							l.add(modifier.getUniqueId().toString());
+						}
+						return l;
+					});
+			FrameworkCommand.Builder<Player> addBuilder = topBuilder.subPlayerCommand("add").argument(
 					attributeArgument).argument(operationArgument).argument(FloatArgument.of("amount")).argument(
 					slotArgument).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -875,8 +928,8 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception ignore) {
 				}
 			});
-			Command.Builder<CommandSender> removeBuilder = topBuilder.literal("remove").senderType(
-					Player.class).argument(uuidArgument).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> removeBuilder = topBuilder.subPlayerCommand("remove").argument(
+					uuidArgument).handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				try {
 					UUID uuid = UUID.fromString((String) commandContext.get("uuid"));
@@ -911,29 +964,28 @@ public class RedfixPlugin extends JavaPlugin {
 				}
 			});
 			
-			this.manager.command(addBuilder);
-			this.manager.command(removeBuilder);
+			CommandManager.register(addBuilder);
+			CommandManager.register(removeBuilder);
 		}
 		
 		//Bal
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balance", "bal", "money");
-			builder = builder.senderType(Player.class).permission("redfix.command.balance").argument(
-					OfflinePlayerArgument.optional("player"), ArgumentDescription.of("player")).handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						OfflinePlayer target = (Player) commandContext.getOptional("player").orElse(player);
-						sendMessage(player,
-								"§aBalance: " + EconomyManager.getMoney(target.getUniqueId()) + getConfig().getString(
-										"economy.symbol", "$"));
-					});
-			this.manager.command(builder);
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("balance", "bal", "money");
+			builder = builder.permission("redfix.command.balance").argument(
+					OfflinePlayerArgument.of("player").optional(), "player").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				OfflinePlayer target = (Player) commandContext.getOptional("player").orElse(player);
+				sendMessage(player,
+						"§aBalance: " + EconomyManager.getMoney(target.getUniqueId()) + getConfig().getString(
+								"economy.symbol", "$"));
+			});
+			CommandManager.register(builder);
 		}
 		
 		//Baltop
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("balancetop", "baltop");
-			builder = builder.senderType(Player.class).permission("redfix.command.balance").handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("balancetop", "baltop");
+			builder = builder.permission("redfix.command.balance").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				double value = Double.MIN_VALUE;
 				UUID uuid = null;
@@ -950,15 +1002,15 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, "§6Player: " + Bukkit.getOfflinePlayer(uuid).getName());
 				sendMessage(player, "§aBalance: " + value + getConfig().getString("economy.symbol", "$"));
 			});
-			this.manager.command(builder);
+			CommandManager.register(builder);
 		}
 		
 		//Economy
 		{
-			Command.Builder<CommandSender> topBuilder = this.manager.commandBuilder("economy", "eco");
+			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder("economy", "eco");
 			
-			Command.Builder<CommandSender> setBuilder = topBuilder.literal("set").permission(
-					Permission.of("redfix.command.economy.set")).argument(OfflinePlayerArgument.of("player")).argument(
+			FrameworkCommand.Builder<CommandSender> setBuilder = topBuilder.subCommand("set").permission(
+					"redfix.command.economy.set").argument(OfflinePlayerArgument.of("player")).argument(
 					DoubleArgument.of("amount")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				OfflinePlayer player = commandContext.get("player");
@@ -968,8 +1020,8 @@ public class RedfixPlugin extends JavaPlugin {
 						"economy.symbol", "$"));
 				saveEco();
 			});
-			Command.Builder<CommandSender> giveBuilder = topBuilder.literal("give").permission(
-					Permission.of("redfix.command.economy.give")).argument(OfflinePlayerArgument.of("player")).argument(
+			FrameworkCommand.Builder<CommandSender> giveBuilder = topBuilder.subCommand("give").permission(
+					"redfix.command.economy.give").argument(OfflinePlayerArgument.of("player")).argument(
 					DoubleArgument.of("amount")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				OfflinePlayer player = commandContext.get("player");
@@ -980,8 +1032,8 @@ public class RedfixPlugin extends JavaPlugin {
 								"$"));
 				saveEco();
 			});
-			Command.Builder<CommandSender> takeBuilder = topBuilder.literal("take").permission(
-					Permission.of("redfix.command.economy.take")).argument(OfflinePlayerArgument.of("player")).argument(
+			FrameworkCommand.Builder<CommandSender> takeBuilder = topBuilder.subCommand("take").permission(
+					"redfix.command.economy.take").argument(OfflinePlayerArgument.of("player")).argument(
 					DoubleArgument.of("amount")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				OfflinePlayer player = commandContext.get("player");
@@ -991,8 +1043,8 @@ public class RedfixPlugin extends JavaPlugin {
 						"$") + " from player " + player.getName());
 				saveEco();
 			});
-			Command.Builder<CommandSender> resetBuilder = topBuilder.literal("reset").permission(
-					Permission.of("redfix.command.economy.reset")).argument(OfflinePlayerArgument.of("player")).handler(
+			FrameworkCommand.Builder<CommandSender> resetBuilder = topBuilder.subCommand("reset").permission(
+					"redfix.command.economy.reset").argument(OfflinePlayerArgument.of("player")).handler(
 					commandContext -> {
 						Player sender = (Player) commandContext.getSender();
 						OfflinePlayer player = commandContext.get("player");
@@ -1001,20 +1053,29 @@ public class RedfixPlugin extends JavaPlugin {
 						saveEco();
 					});
 			
-			this.manager.command(setBuilder);
-			this.manager.command(giveBuilder);
-			this.manager.command(takeBuilder);
-			this.manager.command(resetBuilder);
+			CommandManager.register(setBuilder);
+			CommandManager.register(giveBuilder);
+			CommandManager.register(takeBuilder);
+			CommandManager.register(resetBuilder);
 		}
 		
 		//Pay
 		{
-			Command.Builder<CommandSender> builder = this.manager.commandBuilder("pay").argument(
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("pay").argument(
 					OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount")).handler(
 					commandContext -> {
 						Player sender = (Player) commandContext.getSender();
 						OfflinePlayer player = commandContext.get("player");
 						double amount = commandContext.get("amount");
+						if (!sender.hasPermission("redfix.command.pay.offline") && !player.isOnline()) {
+							sendMessage(sender, "§4You can't pay offline Players");
+						}
+						if (!sender.hasPermission("redfix.command.pay.offline"))
+							if (!sender.hasPermission(
+									"redfix.command.pay.ignoredistance") && player.getPlayer().getLocation().distance(
+									sender.getLocation()) > this.getConfig().getDouble("pay.distance", 50)) {
+								sendMessage(sender, "§4You can't pay Players out of your range");
+							}
 						if (EconomyManager.getMoney(sender.getUniqueId()) < amount) {
 							sendMessage(sender, "§4You have not enough money");
 							return;
@@ -1028,14 +1089,313 @@ public class RedfixPlugin extends JavaPlugin {
 						saveEco();
 					});
 			
-			this.manager.command(builder);
+			CommandManager.register(builder);
+		}
+		
+		//Broadcast
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("broadcast",
+					"bc").permission("redfix.command.broadcast").argument(StringArrayArgument.of("message")).handler(
+					commandContext -> {
+						String[] msg = commandContext.get("message");
+						String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
+							sb.append(s);
+							sb.append(" ");
+						}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+								"§$1").replaceAll("&§§", "&");
+						Bukkit.broadcastMessage("§6[§4Broadcast§6] §a" + message);
+					});
+			
+			CommandManager.register(builder);
+		}
+		
+		//Tp
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("tp").permission(
+					"redfix.command.tp.toplayer").argument(PlayerArgument.of("player")).argument(
+					PlayerArgument.of("target").optional()).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				Player player = commandContext.get("player");
+				Player target = commandContext.getOrDefault("target", sender);
+				Bukkit.getScheduler().runTask(this, () -> target.teleport(player));
+			});
+			CommandManager.register(builder);
+		}
+		
+		//TpHere
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("tphere").permission(
+					"redfix.command.tp.here").argument(PlayerArgument.of("target")).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				Player target = commandContext.get("target");
+				Bukkit.getScheduler().runTask(this, () -> target.teleport(sender));
+			});
+			CommandManager.register(builder);
+		}
+		
+		//TpAll
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("tpall").permission(
+					"redfix.command.tp.all").argument(PlayerArgument.of("player").optional()).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						Player player = commandContext.getOrDefault("player", sender);
+						Bukkit.getScheduler().runTask(this,
+								() -> Bukkit.getOnlinePlayers().forEach(p -> p.teleport(player)));
+					});
+			CommandManager.register(builder);
+		}
+		
+		//TpPos
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("tppos").permission(
+					"redfix.command.tp.pos").argument(DoubleArgument.of("x")).argument(DoubleArgument.of("y")).argument(
+					DoubleArgument.of("z")).argument(WorldArgument.of("world").optional()).argument(
+					PlayerArgument.of("target").optional()).handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				Player target = commandContext.getOrDefault("target", sender);
+				World world = commandContext.getOrDefault("world", sender.getWorld());
+				double x = commandContext.get("x");
+				double y = commandContext.get("y");
+				double z = commandContext.get("z");
+				Bukkit.getScheduler().runTask(this, () -> target.teleport(new Location(world, x, y, z)));
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Kick
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("kick").permission(
+					"redfix.command.kick").argument(PlayerArgument.of("player")).argument(
+					StringArgument.of("message").optional()).handler(commandContext -> {
+				Player player = commandContext.get("player");
+				String message0 = commandContext.getOrDefault("message", "");
+				String message = message0.replaceAll("&", "§");
+				Bukkit.getScheduler().runTask(this, () -> player.kickPlayer(message));
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Ban
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ban").permission(
+					"redfix.command.ban").argument(OfflinePlayerArgument.of("player")).argument(
+					StringArgument.of("message").optional()).handler(commandContext -> {
+				OfflinePlayer player = commandContext.get("player");
+				String message0 = commandContext.getOrDefault("message", "");
+				String message = message0.replaceAll("&", "§");
+				Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message, null, null).save();
+				if (player.isOnline())
+					Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
+			});
+			CommandManager.register(builder);
+		}
+		
+		//TempBan
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("tempban").permission(
+					"redfix.command.tempban").argument(OfflinePlayerArgument.of("player")).argument(
+					IntegerArgument.of("duration")).argument(StringArgument.of("message").optional()).handler(
+					commandContext -> {
+						OfflinePlayer player = commandContext.get("player");
+						int minutes = commandContext.get("duration");
+						String message0 = commandContext.getOrDefault("message", "");
+						String message = message0.replaceAll("&", "§");
+						Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message,
+								Date.from(Instant.now().plus(minutes, ChronoUnit.MINUTES)), null).save();
+						if (player.isOnline())
+							Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
+					});
+			CommandManager.register(builder);
+		}
+		
+		//Mute
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("mute").permission(
+					"redfix.command.mute").argument(PlayerArgument.of("player")).handler(commandContext -> {
+				Player player = commandContext.get("player");
+				muted.put(player.getUniqueId(), Long.MAX_VALUE);
+			});
+			CommandManager.register(builder);
+		}
+		
+		//TempMute
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("tempmute").permission(
+					"redfix.command.mute").argument(PlayerArgument.of("player")).argument(
+					IntegerArgument.of("duration")).handler(commandContext -> {
+				Player player = commandContext.get("player");
+				int minutes = commandContext.get("duration");
+				muted.put(player.getUniqueId(), System.currentTimeMillis() + minutes * 60 * 1000);
+			});
+			CommandManager.register(builder);
+		}
+		
+		//UnMute
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("unmute").permission(
+					"redfix.command.unmute").argument(PlayerArgument.of("player")).handler(commandContext -> {
+				Player player = commandContext.get("player");
+				muted.remove(player.getUniqueId());
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Roll
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("roll").permission(
+					"redfix.command.roll").argument(IntegerArgument.optional("maxValue", 100)).handler(
+					commandContext -> {
+						int maxValue = commandContext.get("maxValue");
+						sendMessage(commandContext.getSender(), "Roll: " + (new Random().nextInt(maxValue) + 1));
+					});
+			CommandManager.register(builder);
+		}
+		
+		//Msg
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("msg").permission(
+					"redfix.command.msg").argument(PlayerArgument.of("player")).argument(
+					StringArrayArgument.of("message")).handler(commandContext -> {
+				String[] msg = commandContext.get("message");
+				Player player = commandContext.get("player");
+				Player sender = (Player) commandContext.getSender();
+				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
+					sb.append(s);
+					sb.append(" ");
+				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+						"§$1").replaceAll("&§§", "&");
+				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
+				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
+				if (vaultChat != null) {
+					player.sendMessage("§7[" + vaultChat.getPlayerPrefix(
+							sender) + sender.getDisplayName() + vaultChat.getPlayerSuffix(sender) + "§7] §f" + message);
+				}
+				else {
+					player.sendMessage("§7[" + sender.getDisplayName() + "§7] §f" + message);
+				}
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Re
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("r").permission(
+					"redfix.command.msg").argument(StringArrayArgument.of("message")).handler(commandContext -> {
+				String[] msg = commandContext.get("message");
+				Player sender = (Player) commandContext.getSender();
+				if (!lastMessaged.containsKey(sender.getUniqueId())) {
+					sendMessage(sender, "Du hast keinen Dialog mit einem Spieler.");
+					return;
+				}
+				UUID target = lastMessaged.get(sender.getUniqueId());
+				if (!Bukkit.getOfflinePlayer(target).isOnline()) {
+					sendMessage(sender, "Der Spieler ist nicht online.");
+					return;
+				}
+				Player player = Bukkit.getPlayer(target);
+				
+				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
+					sb.append(s);
+					sb.append(" ");
+				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+						"§$1").replaceAll("&§§", "&");
+				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
+				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
+				if (vaultChat != null) {
+					player.sendMessage("§7[" + vaultChat.getPlayerPrefix(
+							sender) + sender.getDisplayName() + vaultChat.getPlayerSuffix(sender) + "§7] §f" + message);
+				}
+				else {
+					player.sendMessage("§7[" + sender.getDisplayName() + "§7] §f" + message);
+				}
+			});
+			CommandManager.register(builder);
+		}
+		
+		//Me
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("me", "action").permission(
+					"redfix.command.me").argument(StringArrayArgument.of("message")).handler(commandContext -> {
+				String[] msg = commandContext.get("message");
+				Player sender = (Player) commandContext.getSender();
+				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
+					sb.append(s);
+					sb.append(" ");
+				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+						"§$1").replaceAll("&§§", "&");
+				if (vaultChat != null) {
+					Bukkit.broadcastMessage(vaultChat.getPlayerPrefix(
+							sender) + "§7" + sender.getDisplayName() + vaultChat.getPlayerSuffix(
+							sender) + "§7" + message);
+				}
+				else {
+					Bukkit.broadcastMessage("§7" + sender.getDisplayName() + "§7" + message);
+				}
+			});
+			
+			CommandManager.register(builder);
+		}
+		
+		//KillAll
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("killall").permission(
+					"redfix.command.killall").argument(EntityTypeArgument.of("type").optional()).handler(
+					commandContext -> {
+						Bukkit.getScheduler().runTask(this, () -> {
+							Player sender = (Player) commandContext.getSender();
+							if (commandContext.contains("type")) {
+								EntityType type = commandContext.get("type");
+								Stream<Entity> entityStream = sender.getWorld().getEntities().stream().filter(
+										e -> e.getType() == type).filter(e -> e.getType() != EntityType.PLAYER);
+								List<Entity> entities = entityStream.toList();
+								entities.forEach(Entity::remove);
+								sendMessage(sender, "Removed " + entities.size() + " Entities");
+							}
+							else {
+								Stream<LivingEntity> entityStream = sender.getWorld().getLivingEntities().stream().filter(
+										e -> e instanceof Mob);
+								List<LivingEntity> entities = entityStream.toList();
+								entities.forEach(LivingEntity::remove);
+								sendMessage(sender, "Removed " + entities.size() + " Entities");
+							}
+						});
+					});
+			CommandManager.register(builder);
+		}
+		
+		//InvisibleItemFrame
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("invitemframe",
+					"iif").permission("redfix.command.invitemframe").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player sender = (Player) commandContext.getSender();
+					RayTraceResult result = sender.getWorld().rayTrace(sender.getEyeLocation(),
+							sender.getEyeLocation().getDirection(), 5, FluidCollisionMode.NEVER, true, 0,
+							e -> e.getType() == EntityType.ITEM_FRAME);
+					if (result != null) {
+						Entity entity = result.getHitEntity();
+						if (entity instanceof ItemFrame itemFrame) {
+							itemFrame.setVisible(!itemFrame.isVisible());
+						}
+						else {
+							sendMessage(sender, "Du schaust nicht auf einen Itemframe");
+						}
+					}
+					else {
+						sendMessage(sender, "Du schaust nicht auf einen Itemframe");
+					}
+				});
+			});
+			CommandManager.register(builder);
 		}
 		
 		//TODO: weather, clear
 		//TODO: killall, suicide, sudo
-		//TODO: balance
+		//TODO: msg, mail
 		//TODO: tp, tphere, tppos, tpall
 		//TODO: tpa, tpahere, tpaall, tpaaccept, tpareject / tpadeny
+		//TODO: home, warp, invsee (see, see+edit)
 		//To Improve:
 		//TODO: ptime, pweather, time
 	}
@@ -1059,7 +1419,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Map.entry("commandspy.prefix", "§cCommandSpy » "),
 				Map.entry("commandspy.command_enable", "§7CommandSpy wurde §eaktiviert"),
 				Map.entry("commandspy.command_disable", "§7CommandSpy wurde §edeaktiviert"),
-				
+
 				Map.entry("prefix", "§4Red§eFix §a» §r"),
 				Map.entry("chat.shout.prefix", "§a[Shout] "),
 				Map.entry("chat.ask.prefix", "§9[Question] ")
