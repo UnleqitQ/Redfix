@@ -1167,9 +1167,10 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("kick").permission(
 					"redfix.command.kick").argument(PlayerArgument.of("player")).argument(
-					StringArgument.of("message").optional()).handler(commandContext -> {
+					StringArrayArgument.of("message").optional()).handler(commandContext -> {
 				Player player = commandContext.get("player");
-				String message0 = commandContext.getOrDefault("message", "");
+				String[] smsg = commandContext.getOrDefault("message", new String[0]);
+				String message0 = String.join(" ", smsg);
 				String message = message0.replaceAll("&", "§");
 				Bukkit.getScheduler().runTask(this, () -> player.kickPlayer(message));
 			});
@@ -1180,9 +1181,10 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ban").permission(
 					"redfix.command.ban").argument(OfflinePlayerArgument.of("player")).argument(
-					StringArgument.of("message").optional()).handler(commandContext -> {
+					StringArrayArgument.of("message").optional()).handler(commandContext -> {
 				OfflinePlayer player = commandContext.get("player");
-				String message0 = commandContext.getOrDefault("message", "");
+				String[] smsg = commandContext.getOrDefault("message", new String[0]);
+				String message0 = String.join(" ", smsg);
 				String message = message0.replaceAll("&", "§");
 				Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message, null, null).save();
 				if (player.isOnline())
@@ -1195,11 +1197,12 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("tempban").permission(
 					"redfix.command.tempban").argument(OfflinePlayerArgument.of("player")).argument(
-					IntegerArgument.of("duration")).argument(StringArgument.of("message").optional()).handler(
+					IntegerArgument.of("duration")).argument(StringArrayArgument.of("message").optional()).handler(
 					commandContext -> {
 						OfflinePlayer player = commandContext.get("player");
 						int minutes = commandContext.get("duration");
-						String message0 = commandContext.getOrDefault("message", "");
+						String[] smsg = commandContext.getOrDefault("message", new String[0]);
+						String message0 = String.join(" ", smsg);
 						String message = message0.replaceAll("&", "§");
 						Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message,
 								Date.from(Instant.now().plus(minutes, ChronoUnit.MINUTES)), null).save();
