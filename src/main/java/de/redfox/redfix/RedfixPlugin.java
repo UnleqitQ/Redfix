@@ -1,13 +1,15 @@
 package de.redfox.redfix;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.config.LanguageConfig;
 import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.economy.VaultEconomy;
-import de.redfox.redfix.modules.ArmorStandArms;
-import de.redfox.redfix.modules.God;
+import de.redfox.redfix.modules.*;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
@@ -42,9 +44,13 @@ import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Stream;
 
 public class RedfixPlugin extends JavaPlugin {
@@ -56,6 +62,11 @@ public class RedfixPlugin extends JavaPlugin {
 	public VaultEconomy vaultEconomy;
 	public static Map<UUID, Long> muted = new HashMap<>();
 	public static CommandManager commandManager;
+	
+	public static Map<UUID, Location> playerDeathLocations = new HashMap<>();
+	public static Map<UUID, Deque<Location>> playerLocationHistory = new HashMap<>();
+	public static Map<UUID, Map<String, Home>> homes = new HashMap<>();
+	public static Map<String, Warp> warps = new HashMap<>();
 	
 	public RedfixPlugin() {
 		instance = this;
@@ -75,10 +86,13 @@ public class RedfixPlugin extends JavaPlugin {
 		commandManager = new CommandManager(this);
 		
 		EconomyManager.loadData(new File(pluginPath, "economy.json"));
+		loadHomes(new File(pluginPath, "homes.json"));
+		loadWarps(new File(pluginPath, "warps.json"));
 		
 		initLanguage();
 		
 		new God();
+		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
 		new JailHandler();
 		
 		Bukkit.getScheduler().runTaskTimer(this, new ArmorStandArms()::updateArmorStands, 20, 20);
@@ -102,6 +116,8 @@ public class RedfixPlugin extends JavaPlugin {
 	@Override
 	public void onDisable() {
 		saveEco();
+		saveHomes(new File(pluginPath, "homes.json"));
+		saveWarps(new File(pluginPath, "warps.json"));
 	}
 	
 	public static void saveEco() {
@@ -390,6 +406,82 @@ public class RedfixPlugin extends JavaPlugin {
 						player.getWorld().setFullTime(time);
 						sendMessage(player, "Set time");
 					});
+			commandManager.register(builder);
+		}
+		
+		//SetHome
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("sethome");
+			builder = builder.permission("redfix.command.sethome").argument(StringArgument.of("name"),
+					"Home name").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				String name = commandContext.getArgument("name");
+				addHome(player, name);
+				sendMessage(player, "Created Home");
+			});
+			commandManager.register(builder);
+		}
+		
+		//Home
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("home");
+			builder = builder.permission("redfix.command.home").argument(StringArgument.of("name").tabComplete(
+					(c, a) -> homes.get(((Player) c.getSender()).getUniqueId()).keySet().stream().filter(
+							s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()), "Home name").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						String name = commandContext.getArgument("name");
+						addToHistory(player);
+						player.teleport(homes.get(player.getUniqueId()).get(name).pos);
+					});
+			commandManager.register(builder);
+		}
+		
+		//Homes
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("homes");
+			builder = builder.permission("redfix.command.homes").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				sendMessage(player, String.join(", ", homes.get(player.getUniqueId()).keySet()));
+			});
+			commandManager.register(builder);
+		}
+		
+		//SetWarp
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("setwarp");
+			builder = builder.permission("redfix.command.setwarp").argument(StringArgument.of("name"),
+					"Warp name").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				String name = commandContext.getArgument("name");
+				addWarp(player, name);
+				sendMessage(player, "Created Warp");
+			});
+			commandManager.register(builder);
+		}
+		
+		//Warp
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warp");
+			builder = builder.permission("redfix.command.warp").argument(StringArgument.of("name").tabComplete(
+					(c, a) -> warps.keySet().stream().filter(
+							s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()), "Warp name").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						String name = commandContext.getArgument("name");
+						addToHistory(player);
+						player.teleport(warps.get(name).pos);
+					});
+			commandManager.register(builder);
+		}
+		
+		//Warps
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warps");
+			builder = builder.permission("redfix.command.warps").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				sendMessage(player, String.join(", ", warps.keySet()));
+			});
 			commandManager.register(builder);
 		}
 		
@@ -803,6 +895,34 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//Ec
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("ec");
+			builder = builder.permission("redfix.command.ec").argument(PlayerArgument.of("target").optional()).handler(
+					commandContext -> {
+						Bukkit.getScheduler().runTask(this, () -> {
+							Player player = (Player) commandContext.getSender();
+							Player target = commandContext.getOrDefault("target", player);
+							player.openInventory(target.getEnderChest());
+						});
+					});
+			commandManager.register(builder);
+		}
+		
+		//Invsee
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("invsee");
+			builder = builder.permission("redfix.command.invsee").argument(PlayerArgument.of("target")).handler(
+					commandContext -> {
+						Bukkit.getScheduler().runTask(this, () -> {
+							Player player = (Player) commandContext.getSender();
+							Player target = commandContext.get("target");
+							player.openInventory(target.getInventory());
+						});
+					});
+			commandManager.register(builder);
+		}
+		
 		//SpawnMob
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
@@ -1157,6 +1277,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player sender = (Player) commandContext.getSender();
 				Player player = commandContext.get("player");
 				Player target = commandContext.getOrDefault("target", sender);
+				addToHistory(target);
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(player));
 			});
 			commandManager.register(builder);
@@ -1168,6 +1289,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.tp.here").argument(PlayerArgument.of("target")).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				Player target = commandContext.get("target");
+				addToHistory(target);
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(sender));
 			});
 			commandManager.register(builder);
@@ -1180,8 +1302,10 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						Player sender = (Player) commandContext.getSender();
 						Player player = commandContext.getOrDefault("player", sender);
-						Bukkit.getScheduler().runTask(this,
-								() -> Bukkit.getOnlinePlayers().forEach(p -> p.teleport(player)));
+						Bukkit.getScheduler().runTask(this, () -> Bukkit.getOnlinePlayers().forEach(p -> {
+							p.teleport(player);
+							addToHistory(p);
+						}));
 					});
 			commandManager.register(builder);
 		}
@@ -1189,17 +1313,47 @@ public class RedfixPlugin extends JavaPlugin {
 		//TpPos
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("tppos").permission(
-					"redfix.command.tp.pos").argument(DoubleArgument.of("x")).argument(DoubleArgument.of("y")).argument(
-					DoubleArgument.of("z")).argument(WorldArgument.of("world").optional()).argument(
-					PlayerArgument.of("target").optional()).handler(commandContext -> {
-				Player sender = (Player) commandContext.getSender();
-				Player target = commandContext.getOrDefault("target", sender);
-				World world = commandContext.getOrDefault("world", sender.getWorld());
-				double x = commandContext.get("x");
-				double y = commandContext.get("y");
-				double z = commandContext.get("z");
-				Bukkit.getScheduler().runTask(this, () -> target.teleport(new Location(world, x, y, z)));
-			});
+					"redfix.command.tp.pos").argument(DoubleArgument.of("x").tabComplete(
+					(c, a) -> List.of(Integer.toString(((Player) c.getSender()).getLocation().getBlockX())))).argument(
+					DoubleArgument.of("y").tabComplete((c, a) -> List.of(
+							Integer.toString(((Player) c.getSender()).getLocation().getBlockY())))).argument(
+					DoubleArgument.of("z").tabComplete((c, a) -> List.of(
+							Integer.toString(((Player) c.getSender()).getLocation().getBlockZ())))).argument(
+					WorldArgument.of("world").optional()).argument(PlayerArgument.of("target").optional()).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						Player target = commandContext.getOrDefault("target", sender);
+						World world = commandContext.getOrDefault("world", sender.getWorld());
+						addToHistory(target);
+						double x = commandContext.get("x");
+						double y = commandContext.get("y");
+						double z = commandContext.get("z");
+						Bukkit.getScheduler().runTask(this, () -> target.teleport(new Location(world, x, y, z)));
+					});
+			commandManager.register(builder);
+		}
+		
+		//Back
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("back").permission(
+					"redfix.command.tp.back").argument(PlayerArgument.of("target").optional()).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						Player target = commandContext.getOrDefault("target", sender);
+						Bukkit.getScheduler().runTask(this, () -> pollHistory(target, sender));
+					});
+			commandManager.register(builder);
+		}
+		
+		//DBack
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("dback").permission(
+					"redfix.command.tp.dback").argument(PlayerArgument.of("target").optional()).handler(
+					commandContext -> {
+						Player sender = (Player) commandContext.getSender();
+						Player target = commandContext.getOrDefault("target", sender);
+						Bukkit.getScheduler().runTask(this, () -> pollDeath(target, sender));
+					});
 			commandManager.register(builder);
 		}
 		
@@ -1512,6 +1666,64 @@ public class RedfixPlugin extends JavaPlugin {
 		return instance;
 	}
 	
+	public static void addToHistory(Player player) {
+		if (!playerLocationHistory.containsKey(player.getUniqueId())) {
+			playerLocationHistory.put(player.getUniqueId(), new ConcurrentLinkedDeque<>());
+		}
+		playerLocationHistory.get(player.getUniqueId()).add(player.getLocation());
+	}
+	
+	public static void addHome(Player player, String name) {
+		if (!homes.containsKey(player.getUniqueId())) {
+			homes.put(player.getUniqueId(), new HashMap<>());
+		}
+		homes.get(player.getUniqueId()).put(name, new Home(name, player.getLocation(), player.getUniqueId()));
+		saveHomes(new File(pluginPath, "homes.json"));
+	}
+	
+	public static void addHome(Home home) {
+		if (!homes.containsKey(home.player)) {
+			homes.put(home.player, new HashMap<>());
+		}
+		homes.get(home.player).put(home.name, home);
+	}
+	
+	public static void addWarp(Player player, String name) {
+		warps.put(name, new Warp(name, player.getLocation()));
+		saveWarps(new File(pluginPath, "warps.json"));
+	}
+	
+	public static void addWarp(Warp warp) {
+		warps.put(warp.name, warp);
+	}
+	
+	public static void pollHistory(Player player, Player sender) {
+		if (!playerLocationHistory.containsKey(player.getUniqueId())) {
+			playerLocationHistory.put(player.getUniqueId(), new ConcurrentLinkedDeque<>());
+		}
+		Deque<Location> locationHistory = playerLocationHistory.get(player.getUniqueId());
+		if (!locationHistory.isEmpty()) {
+			player.teleport(locationHistory.pollLast());
+			sendMessage(sender, "§6Spieler wurde zurück teleportiert");
+		}
+		else {
+			sendMessage(sender, "§4History ist leer");
+		}
+	}
+	
+	public static void pollDeath(Player player, Player sender) {
+		if (!playerLocationHistory.containsKey(player.getUniqueId()))
+			return;
+		Location location = playerDeathLocations.get(player.getUniqueId());
+		if (location != null) {
+			player.teleport(location);
+			sendMessage(sender, "§6Spieler wurde zum Todespunkt teleportiert");
+		}
+		else {
+			sendMessage(sender, "§4Kein Todespunkt gespeichert");
+		}
+	}
+	
 	//@formatter:off
 	public void initLanguage() {
 		LanguageConfig language = ConfigManager.language;
@@ -1526,5 +1738,96 @@ public class RedfixPlugin extends JavaPlugin {
 				));
 	}
 	//@formatter:on
+	
+	
+	public static void loadHomes(File file) {
+		file.getParentFile().mkdirs();
+		try {
+			file.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		JsonArray array;
+		try {
+			FileInputStream fis = new FileInputStream(file);
+			array = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonArray();
+			fis.close();
+		} catch (IOException | IllegalStateException e) {
+			e.printStackTrace();
+			return;
+		}
+		try {
+			for (JsonElement element : array) {
+				Home home = Home.load(element.getAsJsonObject());
+				addHome(home);
+			}
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public static void saveHomes(File file) {
+		file.getParentFile().mkdirs();
+		try {
+			file.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		JsonArray array = new JsonArray();
+		homes.values().forEach(m0 -> m0.values().forEach(h -> array.add(h.save())));
+		try {
+			FileOutputStream fos = new FileOutputStream(file);
+			fos.write(array.toString().getBytes());
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void loadWarps(File file) {
+		file.getParentFile().mkdirs();
+		try {
+			file.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		JsonArray array;
+		try {
+			FileInputStream fis = new FileInputStream(file);
+			array = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonArray();
+			fis.close();
+		} catch (IOException | IllegalStateException e) {
+			e.printStackTrace();
+			return;
+		}
+		try {
+			for (JsonElement element : array) {
+				Warp warp = Warp.load(element.getAsJsonObject());
+				addWarp(warp);
+			}
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public static void saveWarps(File file) {
+		file.getParentFile().mkdirs();
+		try {
+			file.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		JsonArray array = new JsonArray(warps.size());
+		warps.values().forEach(w -> array.add(w.save()));
+		try {
+			FileOutputStream fos = new FileOutputStream(file);
+			fos.write(array.toString().getBytes());
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
 }
