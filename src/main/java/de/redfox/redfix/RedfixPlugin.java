@@ -55,6 +55,7 @@ public class RedfixPlugin extends JavaPlugin {
 	public Chat vaultChat;
 	public VaultEconomy vaultEconomy;
 	public static Map<UUID, Long> muted = new HashMap<>();
+	public static CommandManager commandManager;
 	
 	public RedfixPlugin() {
 		instance = this;
@@ -70,6 +71,8 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		saveDefaultConfig();
 		reloadConfig();
+		
+		commandManager = new CommandManager(this);
 		
 		EconomyManager.loadData(new File(pluginPath, "economy.json"));
 		
@@ -190,10 +193,10 @@ public class RedfixPlugin extends JavaPlugin {
 						sendMessage(player, "You got freed");
 					});
 			
-			CommandManager.register(createBuilder);
-			CommandManager.register(removeBuilder);
-			CommandManager.register(jailBuilder);
-			CommandManager.register(freeBuilder);
+			commandManager.register(createBuilder);
+			commandManager.register(removeBuilder);
+			commandManager.register(jailBuilder);
+			commandManager.register(freeBuilder);
 		}
 		
 		//God
@@ -218,7 +221,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sendMessage(player, "Enabled God");
 						}
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Heal
@@ -239,7 +242,7 @@ public class RedfixPlugin extends JavaPlugin {
 					target.getWorld().spawnParticle(Particle.HEART, target.getLocation().clone().add(0, 1.5, 0), 1);
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Fly
@@ -252,7 +255,7 @@ public class RedfixPlugin extends JavaPlugin {
 				target.setAllowFlight(!target.getAllowFlight());
 				sendMessage(player, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Gm
@@ -299,7 +302,7 @@ public class RedfixPlugin extends JavaPlugin {
 						"Switched GameMode to " + gameMode.name().substring(0, 1) + gameMode.name().substring(
 								1).toLowerCase());
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//PTime
@@ -319,7 +322,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Reset player time");
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Weather
@@ -336,7 +339,7 @@ public class RedfixPlugin extends JavaPlugin {
 						player.getWorld().setStorm(weatherType != WeatherType.CLEAR);
 						player.getWorld().setThundering(weatherType == WeatherType.THUNDER);
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//PWeather
@@ -359,7 +362,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Reset player weather");
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Time
@@ -372,7 +375,7 @@ public class RedfixPlugin extends JavaPlugin {
 						player.getWorld().setFullTime(time);
 						sendMessage(player, "Set time");
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Wspeed
@@ -390,7 +393,7 @@ public class RedfixPlugin extends JavaPlugin {
 				player.setWalkSpeed(0.2f);
 				sendMessage(player, "Set walk speed to " + speed);
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Fspeed
@@ -404,7 +407,7 @@ public class RedfixPlugin extends JavaPlugin {
 						player.setFlySpeed(speed / 10);
 						sendMessage(player, "Set fly speed to " + speed);
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Speed
@@ -428,7 +431,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Set walk speed to " + speed);
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Distance
@@ -451,7 +454,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, String.format("Distance: %3.02f", d.length()));
 				sendMessage(player, String.format("Difference: %3.02f %3.02f %3.02f", d.getX(), d.getY(), d.getZ()));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Enchant
@@ -492,7 +495,7 @@ public class RedfixPlugin extends JavaPlugin {
 						} catch (Exception ignored) {
 						}
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Give
@@ -512,7 +515,7 @@ public class RedfixPlugin extends JavaPlugin {
 					e.printStackTrace();
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Playtime
@@ -537,7 +540,7 @@ public class RedfixPlugin extends JavaPlugin {
 						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
 								seconds % 60));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		//PlaytimeTop
 		{
@@ -563,7 +566,7 @@ public class RedfixPlugin extends JavaPlugin {
 						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
 								seconds % 60));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Repair
@@ -636,7 +639,7 @@ public class RedfixPlugin extends JavaPlugin {
 					}
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Unbreakable
@@ -665,7 +668,7 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception ignored) {
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//AddLore
@@ -698,7 +701,7 @@ public class RedfixPlugin extends JavaPlugin {
 						} catch (Exception ignored) {
 						}
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Craft
@@ -710,7 +713,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openWorkbench(null, true);
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Anvil
@@ -722,7 +725,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.ANVIL));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Grindstone
@@ -734,7 +737,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.GRINDSTONE));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Stonecutter
@@ -746,7 +749,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.STONECUTTER));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Loom
@@ -758,7 +761,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.LOOM));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Cartography
@@ -770,7 +773,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.CARTOGRAPHY));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Smithing
@@ -782,7 +785,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.openInventory(Bukkit.createInventory(player, InventoryType.SMITHING));
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//SpawnMob
@@ -813,7 +816,7 @@ public class RedfixPlugin extends JavaPlugin {
 						} catch (Exception ignored) {
 						}
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//CommandSpy
@@ -838,7 +841,7 @@ public class RedfixPlugin extends JavaPlugin {
 				}
 				commandSpy.save();
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Effect
@@ -858,7 +861,7 @@ public class RedfixPlugin extends JavaPlugin {
 					e.printStackTrace();
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Item Attribute
@@ -987,8 +990,8 @@ public class RedfixPlugin extends JavaPlugin {
 				}
 			});
 			
-			CommandManager.register(addBuilder);
-			CommandManager.register(removeBuilder);
+			commandManager.register(addBuilder);
+			commandManager.register(removeBuilder);
 		}
 		
 		//Bal
@@ -1001,7 +1004,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, "§aBalance of " + target.getName() + ": " + EconomyManager.getMoney(
 						target.getUniqueId()) + getConfig().getString("economy.symbol", "$"));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Baltop
@@ -1024,7 +1027,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, "§6Player: " + Bukkit.getOfflinePlayer(uuid).getName());
 				sendMessage(player, "§aBalance: " + value + getConfig().getString("economy.symbol", "$"));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Economy
@@ -1075,10 +1078,10 @@ public class RedfixPlugin extends JavaPlugin {
 						saveEco();
 					});
 			
-			CommandManager.register(setBuilder);
-			CommandManager.register(giveBuilder);
-			CommandManager.register(takeBuilder);
-			CommandManager.register(resetBuilder);
+			commandManager.register(setBuilder);
+			commandManager.register(giveBuilder);
+			commandManager.register(takeBuilder);
+			commandManager.register(resetBuilder);
 		}
 		
 		//Pay
@@ -1111,7 +1114,7 @@ public class RedfixPlugin extends JavaPlugin {
 						saveEco();
 					});
 			
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Broadcast
@@ -1128,7 +1131,7 @@ public class RedfixPlugin extends JavaPlugin {
 						Bukkit.broadcastMessage("§6[§4Broadcast§6] §a" + message);
 					});
 			
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Tp
@@ -1141,7 +1144,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.getOrDefault("target", sender);
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(player));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TpHere
@@ -1152,7 +1155,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.get("target");
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(sender));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TpAll
@@ -1165,7 +1168,7 @@ public class RedfixPlugin extends JavaPlugin {
 						Bukkit.getScheduler().runTask(this,
 								() -> Bukkit.getOnlinePlayers().forEach(p -> p.teleport(player)));
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TpPos
@@ -1182,7 +1185,7 @@ public class RedfixPlugin extends JavaPlugin {
 				double z = commandContext.get("z");
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(new Location(world, x, y, z)));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Kick
@@ -1196,7 +1199,7 @@ public class RedfixPlugin extends JavaPlugin {
 				String message = message0.replaceAll("&", "§");
 				Bukkit.getScheduler().runTask(this, () -> player.kickPlayer(message));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Ban
@@ -1212,7 +1215,7 @@ public class RedfixPlugin extends JavaPlugin {
 				if (player.isOnline())
 					Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TempBan
@@ -1231,7 +1234,7 @@ public class RedfixPlugin extends JavaPlugin {
 						if (player.isOnline())
 							Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Mute
@@ -1241,7 +1244,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = commandContext.get("player");
 				muted.put(player.getUniqueId(), Long.MAX_VALUE);
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TempMute
@@ -1253,7 +1256,7 @@ public class RedfixPlugin extends JavaPlugin {
 				int minutes = commandContext.get("duration");
 				muted.put(player.getUniqueId(), System.currentTimeMillis() + minutes * 60 * 1000);
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//UnMute
@@ -1263,7 +1266,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = commandContext.get("player");
 				muted.remove(player.getUniqueId());
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Roll
@@ -1274,7 +1277,7 @@ public class RedfixPlugin extends JavaPlugin {
 						int maxValue = commandContext.get("maxValue");
 						sendMessage(commandContext.getSender(), "Roll: " + (new Random().nextInt(maxValue) + 1));
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Msg
@@ -1311,7 +1314,7 @@ public class RedfixPlugin extends JavaPlugin {
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Re
@@ -1357,7 +1360,7 @@ public class RedfixPlugin extends JavaPlugin {
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Me
@@ -1384,7 +1387,7 @@ public class RedfixPlugin extends JavaPlugin {
 				}
 			});
 			
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//Colors
@@ -1416,7 +1419,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sender.sendMessage("§rr - §rReset");
 			});
 			
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//KillAll
@@ -1443,7 +1446,7 @@ public class RedfixPlugin extends JavaPlugin {
 							}
 						});
 					});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//InvisibleItemFrame
@@ -1469,7 +1472,7 @@ public class RedfixPlugin extends JavaPlugin {
 					}
 				});
 			});
-			CommandManager.register(builder);
+			commandManager.register(builder);
 		}
 		
 		//TODO: weather, clear
