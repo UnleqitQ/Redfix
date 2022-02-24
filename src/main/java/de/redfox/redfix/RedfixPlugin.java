@@ -229,9 +229,9 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("heal");
 			builder = builder.permission("redfix.command.heal").flag(
 					FrameworkFlag.of("particle").setDescription("Spawn a heart particle")).argument(
-					PlayerArgument.of("player").optional(null), "player").handler(commandContext -> {
+					PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+				Player target = (Player) commandContext.getOrDefault("player", player);
 				target.setHealth(
 						target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue() + target.getAbsorptionAmount());
 				target.setExhaustion(0);
@@ -241,6 +241,21 @@ public class RedfixPlugin extends JavaPlugin {
 				if (commandContext.getFlag("particle")) {
 					target.getWorld().spawnParticle(Particle.HEART, target.getLocation().clone().add(0, 1.5, 0), 1);
 				}
+			});
+			commandManager.register(builder);
+		}
+		
+		//Saturation
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("saturation", "eat");
+			builder = builder.permission("redfix.command.saturation").argument(PlayerArgument.of("player").optional(),
+					"player").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				Player target = commandContext.getOrDefault("player", player);
+				target.setExhaustion(0);
+				target.setSaturation(20);
+				target.setFoodLevel(20);
+				sendMessage(target, "Your stomach is full");
 			});
 			commandManager.register(builder);
 		}
