@@ -425,15 +425,24 @@ public class RedfixPlugin extends JavaPlugin {
 		//Home
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("home");
-			builder = builder.permission("redfix.command.home").argument(StringArgument.of("name").tabComplete(
-					(c, a) -> homes.get(((Player) c.getSender()).getUniqueId()).keySet().stream().filter(
-							s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()), "Home name").handler(
-					commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						String name = commandContext.getArgument("name");
-						addToHistory(player);
-						player.teleport(homes.get(player.getUniqueId()).get(name).pos);
-					});
+			builder = builder.permission("redfix.command.home").argument(
+					StringArgument.of("name").tabComplete((c, a) -> {
+						if (!homes.containsKey(((Player) c.getSender()).getUniqueId())) {
+							homes.put(((Player) c.getSender()).getUniqueId(), new HashMap<>());
+						}
+						return homes.get(((Player) c.getSender()).getUniqueId()).keySet().stream().filter(
+								s -> s.toLowerCase().startsWith(a.toLowerCase())).toList();
+					}), "Home name").handler(commandContext -> {
+				Player player = (Player) commandContext.getSender();
+				String name = commandContext.getArgument("name");
+				Home home = homes.get(player.getUniqueId()).get(name);
+				if (home == null) {
+					sendMessage(player, "Did not find home");
+					return;
+				}
+				addToHistory(player);
+				player.teleport(home.pos);
+			});
 			commandManager.register(builder);
 		}
 		
@@ -442,9 +451,10 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("homes");
 			builder = builder.permission("redfix.command.homes").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				if (!homes.containsKey(player.getUniqueId()))
+				if (!homes.containsKey(player.getUniqueId()) || homes.get(player.getUniqueId()).size() == 0)
 					sendMessage(player, "You have no homes");
-				sendMessage(player, String.join(", ", homes.get(player.getUniqueId()).keySet()));
+				else
+					sendMessage(player, String.join(", ", homes.get(player.getUniqueId()).keySet()));
 			});
 			commandManager.register(builder);
 		}
@@ -471,8 +481,13 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
 						String name = commandContext.getArgument("name");
+						Warp warp = warps.get(name);
+						if (warp == null) {
+							sendMessage(player, "Did not find warp");
+							return;
+						}
 						addToHistory(player);
-						player.teleport(warps.get(name).pos);
+						player.teleport(warp.pos);
 					});
 			commandManager.register(builder);
 		}
@@ -482,7 +497,10 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warps");
 			builder = builder.permission("redfix.command.warps").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				sendMessage(player, String.join(", ", warps.keySet()));
+				if (warps.size() == 0)
+					sendMessage(player, "There are no warps");
+				else
+					sendMessage(player, String.join(", ", warps.keySet()));
 			});
 			commandManager.register(builder);
 		}
@@ -929,7 +947,11 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
 			builder = builder.permission("redfix.command.spawnmob").argument(
-					EnumArgument.of("entity", EntityType.class)).argument(IntegerArgument.optional("count", 1)).handler(
+					EnumArgument.of("entity", EntityType.class).tabComplete(
+							(c, a) -> Arrays.stream(EntityType.values()).map(EntityType::getKey).map(
+									NamespacedKey::getKey).filter(
+									s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()).parser(
+							(c, a) -> EntityType.fromName(a))).argument(IntegerArgument.optional("count", 1)).handler(
 					commandContext -> {
 						try {
 							Player player = (Player) commandContext.getSender();
