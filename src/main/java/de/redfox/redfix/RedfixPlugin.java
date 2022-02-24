@@ -1409,10 +1409,11 @@ public class RedfixPlugin extends JavaPlugin {
 				sender.sendMessage("§re - §eColor");
 				sender.sendMessage("§rf - §fColor");
 				sender.sendMessage("§rl - §lBold");
-				sender.sendMessage("§ri - §iCursive");
+				sender.sendMessage("§ro - §oCursive");
 				sender.sendMessage("§rn - §nUnderline");
 				sender.sendMessage("§rm - §mStrikethrough");
 				sender.sendMessage("§rk - §kMagic");
+				sender.sendMessage("§rr - §rReset");
 			});
 			
 			CommandManager.register(builder);
