@@ -11,6 +11,8 @@ import de.redfox.redfix.modules.God;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
+import de.redfox.redfix.utils.PlayerWeatherType;
+import de.redfox.redfix.utils.WeatherType;
 import me.unleqitq.commandframework.CommandManager;
 import me.unleqitq.commandframework.building.argument.*;
 import me.unleqitq.commandframework.building.command.FrameworkCommand;
@@ -308,7 +310,7 @@ public class RedfixPlugin extends JavaPlugin {
 					IntegerArgument.of("time").optional(), "Time, if none given resets").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				if (commandContext.contains("time")) {
-					int time = (int) commandContext.getOptional("time").orElse(0);
+					int time = commandContext.get("time");
 					player.setPlayerTime(time, commandContext.getFlag("relative"));
 					sendMessage(player, "Set player time");
 				}
@@ -320,16 +322,36 @@ public class RedfixPlugin extends JavaPlugin {
 			CommandManager.register(builder);
 		}
 		
+		//Weather
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("weather");
+			builder = builder.permission("redfix.command.pweather").argument(
+					EnumArgument.of("weather", WeatherType.class).parser(
+							(c, a) -> WeatherType.getByName(a)).tabComplete(
+							(c, a) -> WeatherType.getAllNames().stream().filter(
+									s -> s.startsWith(a.toLowerCase())).toList()), "Weather type").handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						WeatherType weatherType = commandContext.get("weather");
+						player.getWorld().setStorm(weatherType != WeatherType.CLEAR);
+						player.getWorld().setThundering(weatherType == WeatherType.THUNDER);
+					});
+			CommandManager.register(builder);
+		}
+		
 		//PWeather
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("pweather");
 			builder = builder.permission("redfix.command.pweather").argument(
-					EnumArgument.of("weather", WeatherType.class).optional(null),
+					EnumArgument.of("weather", PlayerWeatherType.class).parser(
+							(c, a) -> PlayerWeatherType.getByName(a)).tabComplete(
+							(c, a) -> PlayerWeatherType.getAllNames().stream().filter(
+									s -> s.startsWith(a.toLowerCase())).toList()).optional(),
 					"Weather type, if none given resets").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				if (commandContext.contains("weather")) {
-					WeatherType type = (WeatherType) commandContext.getArgument("weather");
-					player.setPlayerWeather(type);
+					PlayerWeatherType type = commandContext.getArgument("weather");
+					player.setPlayerWeather(type.getBase());
 					sendMessage(player, "Set player weather");
 				}
 				else {
@@ -486,7 +508,8 @@ public class RedfixPlugin extends JavaPlugin {
 						player.getInventory().addItem(new ItemStack(material, material.getMaxStackSize()));
 					}
 					player.getInventory().addItem(new ItemStack(material, count % material.getMaxStackSize()));
-				} catch (Exception ignored) {
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
 			});
 			CommandManager.register(builder);
@@ -702,7 +725,7 @@ public class RedfixPlugin extends JavaPlugin {
 			CommandManager.register(builder);
 		}
 		
-		//grindstone
+		//Grindstone
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("grindstone");
 			builder = builder.permission("redfix.command.grindstone").handler(commandContext -> {
@@ -714,7 +737,7 @@ public class RedfixPlugin extends JavaPlugin {
 			CommandManager.register(builder);
 		}
 		
-		//stonecutter
+		//Stonecutter
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("stonecutter");
 			builder = builder.permission("redfix.command.stonecutter").handler(commandContext -> {
@@ -825,14 +848,14 @@ public class RedfixPlugin extends JavaPlugin {
 					EffectArgument.of("effect")).argument(IntegerArgument.optional("duration", 30)).argument(
 					IntegerArgument.optional("level", 0)).handler(commandContext -> {
 				try {
-					Player player = (Player) commandContext.get("player");
-					String effectName = ((String) commandContext.get("effect")).toLowerCase();
-					int duration = (int) commandContext.get("duration");
-					int level = (int) commandContext.get("level");
-					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> player.addPotionEffect(
-							new PotionEffect(PotionEffectType.getByKey(NamespacedKey.fromString(effectName)),
-									duration * 20, level)));
-				} catch (Exception ignored) {
+					Player player = commandContext.get("player");
+					PotionEffectType effectType = commandContext.get("effect");
+					int duration = commandContext.get("duration");
+					int level = commandContext.get("level");
+					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(),
+							() -> player.addPotionEffect(new PotionEffect(effectType, duration * 20, level)));
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
 			});
 			CommandManager.register(builder);
@@ -974,10 +997,9 @@ public class RedfixPlugin extends JavaPlugin {
 			builder = builder.permission("redfix.command.balance").argument(
 					OfflinePlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
-				OfflinePlayer target = (Player) commandContext.getOptional("player").orElse(player);
-				sendMessage(player,
-						"§aBalance: " + EconomyManager.getMoney(target.getUniqueId()) + getConfig().getString(
-								"economy.symbol", "$"));
+				OfflinePlayer target = commandContext.getOrDefault("player", player);
+				sendMessage(player, "§aBalance of " + target.getName() + ": " + EconomyManager.getMoney(
+						target.getUniqueId()) + getConfig().getString("economy.symbol", "$"));
 			});
 			CommandManager.register(builder);
 		}
@@ -1266,16 +1288,27 @@ public class RedfixPlugin extends JavaPlugin {
 				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
 					sb.append(s);
 					sb.append(" ");
-				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
-						"§$1").replaceAll("&§§", "&");
+				}, StringBuilder::append).toString();
 				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
 				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
 				if (vaultChat != null) {
-					player.sendMessage("§7[" + vaultChat.getPlayerPrefix(
-							sender) + sender.getDisplayName() + vaultChat.getPlayerSuffix(sender) + "§7] §f" + message);
+					player.sendMessage(("§7[§5" + vaultChat.getPlayerPrefix(sender) + Objects.requireNonNullElse(
+							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
+							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(
+							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
+									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
+									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+									"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 				else {
-					player.sendMessage("§7[" + sender.getDisplayName() + "§7] §f" + message);
+					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
+							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
 			CommandManager.register(builder);
@@ -1301,16 +1334,27 @@ public class RedfixPlugin extends JavaPlugin {
 				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
 					sb.append(s);
 					sb.append(" ");
-				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
-						"§$1").replaceAll("&§§", "&");
+				}, StringBuilder::append).toString();
 				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
 				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
 				if (vaultChat != null) {
-					player.sendMessage("§7[" + vaultChat.getPlayerPrefix(
-							sender) + sender.getDisplayName() + vaultChat.getPlayerSuffix(sender) + "§7] §f" + message);
+					player.sendMessage(("§7[§5" + vaultChat.getPlayerPrefix(sender) + Objects.requireNonNullElse(
+							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
+							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(
+							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
+									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
+									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+									"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 				else {
-					player.sendMessage("§7[" + sender.getDisplayName() + "§7] §f" + message);
+					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
+							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
 			CommandManager.register(builder);
@@ -1322,19 +1366,53 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.me").argument(StringArrayArgument.of("message")).handler(commandContext -> {
 				String[] msg = commandContext.get("message");
 				Player sender = (Player) commandContext.getSender();
+				String name = Objects.requireNonNullElse(sender.getDisplayName(), sender.getName());
 				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
 					sb.append(s);
 					sb.append(" ");
-				}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
-						"§$1").replaceAll("&§§", "&");
+				}, StringBuilder::append).toString();
 				if (vaultChat != null) {
-					Bukkit.broadcastMessage(vaultChat.getPlayerPrefix(
-							sender) + "§7" + sender.getDisplayName() + vaultChat.getPlayerSuffix(
-							sender) + "§7" + message);
+					Bukkit.broadcastMessage(
+							(vaultChat.getPlayerPrefix(sender) + "§7" + name + vaultChat.getPlayerSuffix(
+									sender) + "§7 " + message).replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+									"§$1").replaceAll("&§§", "&"));
 				}
 				else {
-					Bukkit.broadcastMessage("§7" + sender.getDisplayName() + "§7" + message);
+					Bukkit.broadcastMessage(
+							("§7" + name + "§7 " + message).replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+									"§$1").replaceAll("&§§", "&"));
 				}
+			});
+			
+			CommandManager.register(builder);
+		}
+		
+		//Colors
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("colors").permission(
+					"redfix.command.colors").handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				sender.sendMessage("§r0 - §0Color");
+				sender.sendMessage("§r1 - §1Color");
+				sender.sendMessage("§r2 - §2Color");
+				sender.sendMessage("§r3 - §3Color");
+				sender.sendMessage("§r4 - §4Color");
+				sender.sendMessage("§r5 - §5Color");
+				sender.sendMessage("§r6 - §6Color");
+				sender.sendMessage("§r7 - §7Color");
+				sender.sendMessage("§r8 - §8Color");
+				sender.sendMessage("§r9 - §9Color");
+				sender.sendMessage("§ra - §aColor");
+				sender.sendMessage("§rb - §bColor");
+				sender.sendMessage("§rc - §cColor");
+				sender.sendMessage("§rd - §dColor");
+				sender.sendMessage("§re - §eColor");
+				sender.sendMessage("§rf - §fColor");
+				sender.sendMessage("§rl - §lBold");
+				sender.sendMessage("§ri - §iCursive");
+				sender.sendMessage("§rn - §nUnderline");
+				sender.sendMessage("§rm - §mStrikethrough");
+				sender.sendMessage("§rk - §kMagic");
 			});
 			
 			CommandManager.register(builder);
