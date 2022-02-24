@@ -39,6 +39,7 @@ public class Home {
 		object.addProperty("z", pos.getBlockZ());
 		object.addProperty("world", pos.getWorld().getUID().toString());
 		object.addProperty("player", player.toString());
+		object.addProperty("name", name);
 		return object;
 	}
 	

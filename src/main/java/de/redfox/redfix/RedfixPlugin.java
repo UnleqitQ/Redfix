@@ -442,6 +442,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("homes");
 			builder = builder.permission("redfix.command.homes").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
+				if (!homes.containsKey(player.getUniqueId()))
+					sendMessage(player, "You have no homes");
 				sendMessage(player, String.join(", ", homes.get(player.getUniqueId()).keySet()));
 			});
 			commandManager.register(builder);
