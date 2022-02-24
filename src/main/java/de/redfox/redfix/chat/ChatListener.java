@@ -15,7 +15,7 @@ public class ChatListener implements Listener {
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
 	}
 	
-	@EventHandler (priority = EventPriority.LOW)
+	@EventHandler (priority = EventPriority.HIGH)
 	public void onChat(@NotNull AsyncPlayerChatEvent event) {
 		if (event.isCancelled())
 			return;
