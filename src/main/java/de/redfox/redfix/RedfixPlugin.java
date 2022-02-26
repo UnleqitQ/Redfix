@@ -78,6 +78,9 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	@Override
 	public void onEnable() {
+		//WorthCalculator.reset();
+		//WorthCalculator.calculate();
+		
 		ConfigManager.init();
 		
 		saveDefaultConfig();
@@ -88,12 +91,16 @@ public class RedfixPlugin extends JavaPlugin {
 		EconomyManager.loadData(new File(pluginPath, "economy.json"));
 		loadHomes(new File(pluginPath, "homes.json"));
 		loadWarps(new File(pluginPath, "warps.json"));
+		WorthCalculator.load(new File(pluginPath, "worth.yml"));
 		
 		initLanguage();
 		
+		Bukkit.getPluginManager().registerEvents(new Afk(), this);
 		new God();
 		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
 		new JailHandler();
+		Afk.init();
+		Bukkit.getScheduler().runTaskTimer(this, Afk::check, 20, 20);
 		
 		Bukkit.getScheduler().runTaskTimer(this, new ArmorStandArms()::updateArmorStands, 20, 20);
 		
@@ -674,24 +681,19 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("playtimetop");
 			builder = builder.permission("redfix.command.playtimetop").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
-				UUID uuid = null;
-				int time = Integer.MIN_VALUE;
-				for (OfflinePlayer offlinePlayer : Bukkit.getOfflinePlayers()) {
-					int t0 = offlinePlayer.getStatistic(Statistic.PLAY_ONE_MINUTE);
-					if (t0 > time) {
-						time = t0;
-						uuid = offlinePlayer.getUniqueId();
-					}
+				List<OfflinePlayer> players = new ArrayList<>(Arrays.stream(Bukkit.getOfflinePlayers()).toList());
+				players.sort((p2, p1) -> p1.getStatistic(Statistic.PLAY_ONE_MINUTE) - p2.getStatistic(
+						Statistic.PLAY_ONE_MINUTE));
+				sendMessage(sender, "Top PlayTime:");
+				for (int i = 0; i < Math.min(10, players.size()); i++) {
+					int playedTicks = players.get(i).getStatistic(Statistic.PLAY_ONE_MINUTE);
+					int seconds = playedTicks / 20;
+					int minutes = seconds / 60;
+					int hours = minutes / 60;
+					int days = hours / 24;
+					sender.sendMessage("§6" + (i + 1) + ": §3" + players.get(i).getName() + " §a- §6" + String.format(
+							"%02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60, seconds % 60));
 				}
-				int playedTicks = time;
-				int seconds = playedTicks / 20;
-				int minutes = seconds / 60;
-				int hours = minutes / 60;
-				int days = hours / 24;
-				sendMessage(sender, String.format("Player: %s", Bukkit.getOfflinePlayer(uuid).getName()));
-				sendMessage(sender,
-						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
-								seconds % 60));
 			});
 			commandManager.register(builder);
 		}
@@ -943,6 +945,58 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//BetaInvsee
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("betainvsee");
+			builder = builder.permission("redfix.command.invsee").argument(PlayerArgument.of("target")).handler(
+					commandContext -> {
+						Bukkit.getScheduler().runTask(this, () -> {
+							Player player = (Player) commandContext.getSender();
+							Player target = commandContext.get("target");
+							new InvSee(player, target);
+						});
+					});
+			commandManager.register(builder);
+		}
+		
+		//Afk
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("afk");
+			builder = builder.permission("redfix.command.afk").argument(PlayerArgument.of("target").optional()).handler(
+					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						Player target = commandContext.getOrDefault("target", player);
+						if (Afk.isAfk(target.getUniqueId())) {
+							Afk.afkTimes.put(target.getUniqueId(), System.currentTimeMillis());
+						}
+						else {
+							Afk.afkTimes.put(target.getUniqueId(), System.currentTimeMillis() - 1000 * 60 * 5);
+						}
+					});
+			commandManager.register(builder);
+		}
+		
+		//List
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("list", "ls");
+			builder = builder.permission("redfix.command.list").handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				List<? extends Player> players = Bukkit.getOnlinePlayers().stream().toList();
+				for (String groupName : vaultChat.getGroups()) {
+					List<String> pl = players.stream().filter(
+							p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName)).map(
+							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + vaultChat.getPlayerPrefix(
+									p) + p.getDisplayName() + vaultChat.getPlayerSuffix(p) + "§f").map(
+							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
+									"&")).toList();
+					if (pl.size() > 0) {
+						sender.sendMessage("§6" + groupName + ": " + String.join(", ", pl));
+					}
+				}
+			});
+			commandManager.register(builder);
+		}
+		
 		//SpawnMob
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
@@ -1171,23 +1225,18 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Baltop
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("balancetop", "baltop");
-			builder = builder.permission("redfix.command.balance").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				double value = Double.MIN_VALUE;
-				UUID uuid = null;
-				for (Map.Entry<UUID, Double> e : EconomyManager.getAll().entrySet()) {
-					if (e.getValue() > value) {
-						value = e.getValue();
-						uuid = e.getKey();
-					}
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("balancetop", "baltop");
+			builder = builder.permission("redfix.command.balancetop").handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				List<UUID> players = new ArrayList<>(
+						Arrays.stream(Bukkit.getOfflinePlayers()).map(OfflinePlayer::getUniqueId).toList());
+				players.sort((p2, p1) -> Double.compare(EconomyManager.getMoney(p1), EconomyManager.getMoney(p2)));
+				sendMessage(sender, "Top Balance:");
+				for (int i = 0; i < Math.min(10, players.size()); i++) {
+					sender.sendMessage("§6" + (i + 1) + ": §3" + Bukkit.getOfflinePlayer(
+							players.get(i)).getName() + " §a- §6" + vaultEconomy.format(
+							EconomyManager.getMoney(players.get(i))));
 				}
-				if (uuid == null) {
-					sendMessage(player, "No Money registered so far");
-					return;
-				}
-				sendMessage(player, "§6Player: " + Bukkit.getOfflinePlayer(uuid).getName());
-				sendMessage(player, "§aBalance: " + value + getConfig().getString("economy.symbol", "$"));
 			});
 			commandManager.register(builder);
 		}
@@ -1580,6 +1629,136 @@ public class RedfixPlugin extends JavaPlugin {
 					Bukkit.broadcastMessage(
 							("§7" + name + "§7 " + message).replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
 									"§$1").replaceAll("&§§", "&"));
+				}
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//Worth
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("worth").permission(
+					"redfix.command.worth.get").argument(MaterialArgument.of("material")).handler(commandContext -> {
+				Material material = commandContext.get("material");
+				double value = WorthCalculator.getWorth(material, new HashSet<>());
+				if (Double.isNaN(value))
+					sendMessage(commandContext.getSender(), "No Worth");
+				else
+					sendMessage(commandContext.getSender(), "Worth of " + material + " is §6" + vaultEconomy.format(
+							value) + "§f,\nbut you will only receive §6" + vaultEconomy.format(
+							value * (1 - getConfig().getDouble("economy.sellFee", 0.2))) + "§f for selling");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//DefaultWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder(
+					"defaultworth").permission("redfix.command.worth.default").handler(commandContext -> {
+				WorthCalculator.setToDefault();
+				sendMessage(commandContext.getSender(), "Reset worth");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//ClearWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("clearworth").permission(
+					"redfix.command.worth.clear").handler(commandContext -> {
+				WorthCalculator.clear();
+				sendMessage(commandContext.getSender(), "Cleared worth");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//SetWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("setworth").permission(
+					"redfix.command.worth.set").argument(MaterialArgument.of("material")).argument(
+					DoubleArgument.of("value")).handler(commandContext -> {
+				Material material = commandContext.get("material");
+				double value = commandContext.get("value");
+				if (value < 0)
+					value = Double.NaN;
+				WorthCalculator.worthMap.put(material, value);
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//LoadWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("loadworth").permission(
+					"redfix.command.worth.load").handler(commandContext -> {
+				WorthCalculator.load(new File(pluginPath, "worth.yml"));
+				sendMessage(commandContext.getSender(), "Loaded Worth");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//SaveWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("saveworth").permission(
+					"redfix.command.worth.save").handler(commandContext -> {
+				WorthCalculator.save(new File(pluginPath, "worth.yml"));
+				sendMessage(commandContext.getSender(), "Saved Worth");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//CalculateWorth
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder(
+					"calculateworth").permission("redfix.command.worth.calculate").argument(IntegerArgument.of("loops"),
+					"Loops of calculating (-1 for also saving not calculatable)").argument(
+					BooleanArgument.of("replace"), "Replace preexisting values").handler(commandContext -> {
+				int loops = commandContext.get("loops");
+				boolean replace = commandContext.get("replace");
+				if (loops == -1) {
+					WorthCalculator.calculate(true, replace);
+					sendMessage(commandContext.getSender(), "Caluclated Worth");
+				}
+				else
+					Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+						for (int i = 0; i < loops; i++) {
+							WorthCalculator.calculate(false, replace);
+							sendMessage(commandContext.getSender(), "Finished Loop " + (i + 1) + "/" + loops);
+						}
+						sendMessage(commandContext.getSender(), "Caluclated Worth");
+					});
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//Sell
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("sell").permission(
+					"redfix.command.sell").handler(commandContext -> {
+				Player sender = (Player) commandContext.getSender();
+				ItemStack item = sender.getInventory().getItemInMainHand();
+				if (item != null) {
+					if (item.getItemMeta() instanceof Damageable damageable) {
+						if (damageable.hasDamage()) {
+							sendMessage(sender, "Cannot sell damaged items");
+							return;
+						}
+					}
+					double val = WorthCalculator.getWorth(item.getType(), new HashSet<>());
+					if (Double.isNaN(val)) {
+						sendMessage(sender, "Item has no Worth");
+						return;
+					}
+					double cnt = sender.getInventory().getItemInMainHand().getAmount();
+					sender.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+					double pay = val * cnt * (1 - getConfig().getDouble("economy.sellFee", 0.2));
+					EconomyManager.addMoney(sender.getUniqueId(), pay);
+					sendMessage(sender, "You received for selling " + vaultEconomy.format(pay));
 				}
 			});
 			

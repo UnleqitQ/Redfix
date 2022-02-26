@@ -12,3 +12,4 @@ economy:
     plural: "Dollars"
   startMoney: 100
   distance: 50
+  sellFee: 0.2
