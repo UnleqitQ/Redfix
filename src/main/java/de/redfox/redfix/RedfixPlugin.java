@@ -1000,38 +1000,33 @@ public class RedfixPlugin extends JavaPlugin {
 		//SpawnMob
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
-			builder = builder.permission("redfix.command.spawnmob").argument(
-					EnumArgument.of("entity", EntityType.class).tabComplete(
-							(c, a) -> Arrays.stream(EntityType.values()).map(EntityType::getKey).map(
-									NamespacedKey::getKey).filter(
-									s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()).parser(
-							(c, a) -> EntityType.fromName(a))).argument(IntegerArgument.optional("count", 1)).handler(
-					commandContext -> {
-						try {
-							Player player = (Player) commandContext.getSender();
-							EntityType type = commandContext.get("entity");
-							int count = commandContext.get("count");
-							Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
+			builder = builder.permission("redfix.command.spawnmob").argument(EntityTypeArgument.of("entity"),
+					"The Entity to spawn").argument(IntegerArgument.optional("count", 1)).handler(commandContext -> {
+				try {
+					Player player = (Player) commandContext.getSender();
+					EntityType type = commandContext.get("entity");
+					int count = commandContext.get("count");
+					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
 								/*RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
 										player.getEyeLocation().getDirection(), 50, FluidCollisionMode.SOURCE_ONLY,
 										true, 0, Predicates.alwaysFalse());*/
-								RayTraceResult result = player.rayTraceBlocks(50);
-								if (result == null) {
-									for (int i = 0; i < count; i++) {
-										player.getWorld().spawnEntity(player.getLocation(), type);
-									}
-								}
-								else {
-									Location pos = new Location(player.getWorld(), result.getHitPosition().getX(),
-											result.getHitPosition().getY(), result.getHitPosition().getZ());
-									for (int i = 0; i < count; i++) {
-										player.getWorld().spawnEntity(pos, type);
-									}
-								}
-							});
-						} catch (Exception ignored) {
+						RayTraceResult result = player.rayTraceBlocks(50);
+						if (result == null) {
+							for (int i = 0; i < count; i++) {
+								player.getWorld().spawnEntity(player.getLocation(), type);
+							}
+						}
+						else {
+							Location pos = new Location(player.getWorld(), result.getHitPosition().getX(),
+									result.getHitPosition().getY(), result.getHitPosition().getZ());
+							for (int i = 0; i < count; i++) {
+								player.getWorld().spawnEntity(pos, type);
+							}
 						}
 					});
+				} catch (Exception ignored) {
+				}
+			});
 			commandManager.register(builder);
 		}
 		
