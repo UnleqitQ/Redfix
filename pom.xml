@@ -93,7 +93,7 @@
             <groupId>me.unleqitq</groupId>
             <artifactId>CommandFramework</artifactId>
             <version>1.0.0</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.papermc.paper</groupId>
@@ -117,6 +117,7 @@
             <groupId>com.comphenix.protocol</groupId>
             <artifactId>ProtocolLib</artifactId>
             <version>4.7.0</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>

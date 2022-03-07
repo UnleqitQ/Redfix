@@ -60,6 +60,8 @@ import java.util.stream.Stream;
 
 public class RedfixPlugin extends JavaPlugin {
 	
+	private static final int METRICS_ID = 14559;
+	
 	private static RedfixPlugin instance;
 	public CommandSpy commandSpy;
 	public static final String pluginPath = "plugins/Redfix";
