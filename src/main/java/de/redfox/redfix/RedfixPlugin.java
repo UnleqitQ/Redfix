@@ -2054,8 +2054,6 @@ public class RedfixPlugin extends JavaPlugin {
 		for (CommandNode node : commandManager.getRootNodes().values()) {
 			commandManager.updateHelp(node);
 			HelpTopic helpTopic = node.getHelpTopic();
-			Bukkit.broadcastMessage("Help for " + node.getName() + ": " + String.format("{%s, %s}", helpTopic.getName(),
-					helpTopic.getShortText()));
 		}
 		
 		//TODO: weather, clear

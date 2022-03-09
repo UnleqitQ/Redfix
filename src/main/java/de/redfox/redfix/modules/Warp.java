@@ -34,6 +34,7 @@ public class Warp {
 		object.addProperty("y", pos.getBlockY());
 		object.addProperty("z", pos.getBlockZ());
 		object.addProperty("world", pos.getWorld().getUID().toString());
+		object.addProperty("name", name);
 		return object;
 	}
 	
