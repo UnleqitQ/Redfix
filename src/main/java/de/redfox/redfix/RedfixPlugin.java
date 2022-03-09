@@ -27,6 +27,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
@@ -483,9 +484,9 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "You have no homes");
 				else {
 					sendMessage(player, Component.join(JoinConfiguration.separator(Component.text(", ")),
-							homes.get(player.getUniqueId()).keySet().stream().map(
-									h -> Component.text(h).clickEvent(ClickEvent.runCommand("home " + h))).toArray(
-									ComponentLike[]::new)));
+							homes.get(player.getUniqueId()).keySet().stream().map(h -> Component.text(h).hoverEvent(
+									HoverEvent.showText(Component.text("Teleport to " + h))).clickEvent(
+									ClickEvent.runCommand("/home " + h))).toArray(ComponentLike[]::new)));
 				}
 			});
 			commandManager.register(builder);
@@ -533,9 +534,9 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "There are no warps");
 				else
 					sendMessage(player, Component.join(JoinConfiguration.separator(Component.text(", ")),
-							warps.keySet().stream().map(
-									w -> Component.text(w).clickEvent(ClickEvent.runCommand("warp " + w))).toArray(
-									ComponentLike[]::new)));
+							warps.keySet().stream().map(w -> Component.text(w).hoverEvent(
+									HoverEvent.showText(Component.text("Teleport to " + w))).clickEvent(
+									ClickEvent.runCommand("/warp " + w))).toArray(ComponentLike[]::new)));
 			});
 			commandManager.register(builder);
 		}
