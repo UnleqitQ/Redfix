@@ -23,6 +23,10 @@ import me.unleqitq.commandframework.CommandNode;
 import me.unleqitq.commandframework.building.argument.*;
 import me.unleqitq.commandframework.building.command.FrameworkCommand;
 import me.unleqitq.commandframework.building.flag.FrameworkFlag;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.ComponentLike;
+import net.kyori.adventure.text.JoinConfiguration;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
@@ -477,8 +481,12 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = (Player) commandContext.getSender();
 				if (!homes.containsKey(player.getUniqueId()) || homes.get(player.getUniqueId()).size() == 0)
 					sendMessage(player, "You have no homes");
-				else
-					sendMessage(player, String.join(", ", homes.get(player.getUniqueId()).keySet()));
+				else {
+					sendMessage(player, Component.join(JoinConfiguration.separator(Component.text(", ")),
+							homes.get(player.getUniqueId()).keySet().stream().map(
+									h -> Component.text(h).clickEvent(ClickEvent.runCommand("home " + h))).toArray(
+									ComponentLike[]::new)));
+				}
 			});
 			commandManager.register(builder);
 		}
@@ -524,7 +532,10 @@ public class RedfixPlugin extends JavaPlugin {
 				if (warps.size() == 0)
 					sendMessage(player, "There are no warps");
 				else
-					sendMessage(player, String.join(", ", warps.keySet()));
+					sendMessage(player, Component.join(JoinConfiguration.separator(Component.text(", ")),
+							warps.keySet().stream().map(
+									w -> Component.text(w).clickEvent(ClickEvent.runCommand("warp " + w))).toArray(
+									ComponentLike[]::new)));
 			});
 			commandManager.register(builder);
 		}
@@ -2068,6 +2079,10 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void sendMessage(@NotNull CommandSender receiver, String message) {
 		receiver.sendMessage(ConfigManager.language.getMessage("prefix") + message);
+	}
+	
+	public static void sendMessage(@NotNull CommandSender receiver, Component message) {
+		receiver.sendMessage(Component.text(ConfigManager.language.getMessage("prefix")).append(message));
 	}
 	
 	public void registerCommand(String cmd, CommandExecutor handler) {
