@@ -17,7 +17,9 @@ import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
 import de.redfox.redfix.utils.PlayerWeatherType;
 import de.redfox.redfix.utils.WeatherType;
+import me.unleqitq.commandframework.CommandContext;
 import me.unleqitq.commandframework.CommandManager;
+import me.unleqitq.commandframework.CommandNode;
 import me.unleqitq.commandframework.building.argument.*;
 import me.unleqitq.commandframework.building.command.FrameworkCommand;
 import me.unleqitq.commandframework.building.flag.FrameworkFlag;
@@ -35,6 +37,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.help.HelpTopic;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -234,24 +237,24 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//God
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("god");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("god");
 			builder = builder.permission("redfix.command.god").flag(
 							FrameworkFlag.of("silent").setDescription("You get damage but the amount is set to zero")).flag(
 							FrameworkFlag.of("notarget").setDescription("Mobs don't target you")).argument(
 							PlayerArgument.of("player").optional(), "player")
 					//.argument(PlayerArgument.of("player"))
 					.handler(commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						Player target = commandContext.getOrDefault("player", player);
+						CommandSender sender = commandContext.getSender();
+						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 						if (God.players.containsKey(target.getUniqueId())) {
 							God.players.remove(target.getUniqueId());
-							sendMessage(player, "Disabled God");
+							sendMessage(sender, "Disabled God");
 						}
 						else {
 							God.players.put(target.getUniqueId(),
 									new Boolean[]{commandContext.getFlag("silent"), commandContext.getFlag(
 											"notarget")});
-							sendMessage(player, "Enabled God");
+							sendMessage(sender, "Enabled God");
 						}
 					});
 			commandManager.register(builder);
@@ -259,12 +262,12 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Heal
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("heal");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("heal");
 			builder = builder.permission("redfix.command.heal").flag(
 					FrameworkFlag.of("particle").setDescription("Spawn a heart particle")).argument(
 					PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				Player target = (Player) commandContext.getOrDefault("player", player);
+				CommandSender sender = commandContext.getSender();
+				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				target.setHealth(
 						target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue() + target.getAbsorptionAmount());
 				target.setExhaustion(0);
@@ -280,11 +283,11 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Saturation
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("saturation", "eat");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("saturation", "eat");
 			builder = builder.permission("redfix.command.saturation").argument(PlayerArgument.of("player").optional(),
 					"player").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				Player target = commandContext.getOrDefault("player", player);
+				CommandSender sender = commandContext.getSender();
+				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				target.setExhaustion(0);
 				target.setSaturation(20);
 				target.setFoodLevel(20);
@@ -295,20 +298,20 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Fly
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("fly");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("fly");
 			builder = builder.permission("redfix.command.fly").argument(PlayerArgument.of("player").optional(),
 					"player").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				Player target = commandContext.getOrDefault("player", player);
+				CommandSender sender = commandContext.getSender();
+				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				target.setAllowFlight(!target.getAllowFlight());
-				sendMessage(player, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
+				sendMessage(sender, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 			});
 			commandManager.register(builder);
 		}
 		
 		//Gm
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("gamemode", "gm");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("gamemode", "gm");
 			Map<String, GameMode> values = new HashMap<>();
 			values.put("0", GameMode.SURVIVAL);
 			values.put("survival", GameMode.SURVIVAL);
@@ -337,12 +340,12 @@ public class RedfixPlugin extends JavaPlugin {
 					});
 			
 			builder = builder.permission("redfix.command.gamemode").argument(gmArgument, "gamemode").argument(
-					PlayerArgument.of("player").optional(null), "player").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				Player target = (Player) commandContext.getOptional("player").orElseGet(() -> player);
+					PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
+				CommandSender sender = commandContext.getSender();
+				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				GameMode gameMode = values.get(commandContext.get("gamemode"));
 				if (gameMode == null) {
-					sendMessage(player, "Please use a valid gamemode");
+					sendMessage(sender, "Please use a valid gamemode");
 					return;
 				}
 				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> target.setGameMode(gameMode));
@@ -355,13 +358,13 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//PTime
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("ptime");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ptime");
 			builder = builder.permission("redfix.command.ptime").flag(
 					FrameworkFlag.of("relative").setDescription("makes the player time relative")).argument(
 					IntegerArgument.of("time").optional(), "Time, if none given resets").argument(
 					PlayerArgument.of("player").optional()).handler(commandContext -> {
-				Player sender = (Player) commandContext.getSender();
-				Player player = commandContext.getOrDefault("player", sender);
+				CommandSender sender = commandContext.getSender();
+				Player player = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				if (commandContext.contains("time")) {
 					int time = commandContext.get("time");
 					player.setPlayerTime(time, commandContext.getFlag("relative"));
@@ -394,16 +397,16 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//PWeather
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("pweather");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("pweather");
 			builder = builder.permission("redfix.command.pweather").argument(
 					EnumArgument.of("weather", PlayerWeatherType.class).parser(
 							(c, a) -> PlayerWeatherType.getByName(a)).tabComplete(
 							(c, a) -> PlayerWeatherType.getAllNames().stream().filter(
 									s -> s.startsWith(a.toLowerCase())).toList()).optional(),
-					"Weather type, if none given resets").argument(PlayerArgument.of("optional").optional()).handler(
+					"Weather type, if none given resets").argument(PlayerArgument.of("player").optional()).handler(
 					commandContext -> {
-						Player sender = (Player) commandContext.getSender();
-						Player player = commandContext.getOrDefault("player", sender);
+						CommandSender sender = commandContext.getSender();
+						Player player = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 						if (commandContext.contains("weather")) {
 							PlayerWeatherType type = commandContext.getArgument("weather");
 							player.setPlayerWeather(type.getBase());
@@ -530,7 +533,7 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("walkspeed", "wspeed");
 			builder = builder.permission("redfix.command.walkspeed").argument(FloatArgument.of("speed"),
-					"Walking speed").argument(PlayerArgument.of("optional").optional()).handler(commandContext -> {
+					"Walking speed").argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
 				Player player = commandContext.getOrDefault("player", sender);
 				float speed = commandContext.get("speed");
@@ -653,7 +656,8 @@ public class RedfixPlugin extends JavaPlugin {
 		//Give
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("i", "give", "item");
-			builder = builder.permission("redfix.command.give").argument(MaterialArgument.of("material"),
+			builder = builder.permission("redfix.command.give").argument(
+					MaterialArgument.of("material").tabComplete(new MaterialArgument.MaterialTabComplete(false, true)),
 					"The Item").argument(IntegerArgument.optional("count", 1), "The Count").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				Material material = commandContext.get("material");
@@ -2006,6 +2010,31 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//RSudo
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("rsudo").permission(
+					"redfix.command.rsudo").argument(PlayerArgument.of("player")).argument(
+					StringArgument.of("command").tabComplete(
+							(c, s) -> commandManager.getRootNodes().keySet().stream().filter(
+									s0 -> s0.toLowerCase().startsWith(s.toLowerCase())).toList()),
+					"Command to execute").argument(StringArrayArgument.of("arguments"), "Arguments").handler(
+					commandContext -> {
+						String cmd = commandContext.get("command");
+						String[] args = commandContext.get("arguments");
+						Player player = commandContext.get("player");
+						CommandNode node = commandManager.getRootNodes().get(cmd);
+						if (node == null) {
+							sendMessage(commandContext.getSender(), "§4Command not found");
+						}
+						else {
+							CommandContext c = new CommandContext(player, String.join(" ", args));
+							node.executeIgnorePerms(c, args);
+						}
+					});
+			
+			commandManager.register(builder);
+		}
+		
 		//PSudo
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("psudo").permission(
@@ -2020,6 +2049,13 @@ public class RedfixPlugin extends JavaPlugin {
 			});
 			
 			commandManager.register(builder);
+		}
+		
+		for (CommandNode node : commandManager.getRootNodes().values()) {
+			commandManager.updateHelp(node);
+			HelpTopic helpTopic = node.getHelpTopic();
+			Bukkit.broadcastMessage("Help for " + node.getName() + ": " + String.format("{%s, %s}", helpTopic.getName(),
+					helpTopic.getShortText()));
 		}
 		
 		//TODO: weather, clear
