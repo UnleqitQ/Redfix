@@ -1,4 +1,13 @@
+core:
+  prefix: "§aRedFix » "
+
+commandspy:
+  prefix: "§cCommandSpy » "
+  enable: "§7CommandSpy wurde §eaktiviert"
+  disable: "§7CommandSpy wurde §edeaktiviert"
+
 chat:
+  enabled: true
   distance: 50
   shout:
     prefix: "§a[Shout] "

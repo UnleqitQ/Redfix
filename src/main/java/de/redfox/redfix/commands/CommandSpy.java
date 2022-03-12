@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import de.redfox.redfix.RedfixPlugin;
 import de.redfox.redfix.config.ConfigManager;
-import de.redfox.redfix.config.LanguageConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -18,7 +17,7 @@ import java.util.UUID;
 
 public class CommandSpy implements Listener {
 	
-	public enum Messages {
+	/*public enum Messages {
 		PREFIX, COMMAND_DISABLE, COMMAND_ENABLE;
 		
 		String val;
@@ -31,7 +30,7 @@ public class CommandSpy implements Listener {
 			
 			return ret.toString();
 		}
-	}
+	}*/
 	
 	
 	public Set<UUID> players = new HashSet<>();
@@ -46,20 +45,21 @@ public class CommandSpy implements Listener {
 
 		Messages.PREFIX.val = language.getMessage("prefix");
 		Messages.COMMAND_DISABLE.val = language.getMessage("command_disable");
-		Messages.COMMAND_ENABLE.val = language.getMessage("command_enable");*/
+		Messages.COMMAND_ENABLE.val = language.getMessage("command_enable");*
 		
 		LanguageConfig language = ConfigManager.language;
 		
 		CommandSpy.Messages.PREFIX.val = language.getMessage("commandspy.prefix");
 		CommandSpy.Messages.COMMAND_DISABLE.val = language.getMessage("commandspy.command_disable");
-		CommandSpy.Messages.COMMAND_ENABLE.val = language.getMessage("commandspy.command_enable");
+		CommandSpy.Messages.COMMAND_ENABLE.val = language.getMessage("commandspy.command_enable");*/
 		
 		Bukkit.getPluginManager().registerEvents(this, RedfixPlugin.getInstance());
 	}
 	
 	@EventHandler
 	public void onCommandSent(@NotNull PlayerCommandPreprocessEvent event) {
-		String msg = Messages.get(Messages.PREFIX) + "§e" + event.getPlayer().getName() + "§7: §f" + event.getMessage();
+		String msg = RedfixPlugin.getInstance().getConfig().getString("commandspy.prefix",
+				"§cCommandSpy » ") + "§e" + event.getPlayer().getName() + "§7: §f" + event.getMessage();
 		for (UUID uuid : players) {
 			if (event.getPlayer().getUniqueId().equals(uuid))
 				continue;

@@ -8,7 +8,6 @@ import com.google.gson.JsonParser;
 import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
-import de.redfox.redfix.config.LanguageConfig;
 import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.economy.VaultEconomy;
 import de.redfox.redfix.modules.*;
@@ -108,8 +107,6 @@ public class RedfixPlugin extends JavaPlugin {
 		loadHomes(new File(pluginPath, "homes.json"));
 		loadWarps(new File(pluginPath, "warps.json"));
 		WorthCalculator.load(new File(pluginPath, "worth.yml"));
-		
-		initLanguage();
 		
 		afk = new Afk();
 		Bukkit.getPluginManager().registerEvents(afk, this);
@@ -1201,17 +1198,19 @@ public class RedfixPlugin extends JavaPlugin {
 				if (commandSpy.players.contains(player.getUniqueId())) {
 					commandSpy.players.remove(player.getUniqueId());
 					player.sendMessage(
-							CommandSpy.Messages.get(CommandSpy.Messages.PREFIX, CommandSpy.Messages.COMMAND_DISABLE));
+							getConfig().getString("commandspy.prefix", "§cCommandSpy » ") + getConfig().getString(
+									"commandspy.disable", "§7CommandSpy wurde §edeaktiviert"));
 				}
 				else {
 					if (!player.hasPermission("redfix.command.commandspy")) {
-						player.sendMessage(CommandSpy.Messages.get(
-								CommandSpy.Messages.PREFIX) + "I'm sorry, but you don't have the permission");
+						player.sendMessage(getConfig().getString("commandspy.prefix",
+								"§cCommandSpy » ") + "I'm sorry, but you don't have the permission");
 						return;
 					}
 					commandSpy.players.add(player.getUniqueId());
 					player.sendMessage(
-							CommandSpy.Messages.get(CommandSpy.Messages.PREFIX, CommandSpy.Messages.COMMAND_ENABLE));
+							getConfig().getString("commandspy.prefix", "§cCommandSpy » ") + getConfig().getString(
+									"commandspy.enable", "§7CommandSpy wurde §eaktiviert"));
 				}
 				commandSpy.save();
 			});
@@ -2079,11 +2078,12 @@ public class RedfixPlugin extends JavaPlugin {
 	}
 	
 	public static void sendMessage(@NotNull CommandSender receiver, String message) {
-		receiver.sendMessage(ConfigManager.language.getMessage("prefix") + message);
+		receiver.sendMessage(getInstance().getConfig().getString("core.prefix", "§aRedFix » ") + message);
 	}
 	
 	public static void sendMessage(@NotNull CommandSender receiver, Component message) {
-		receiver.sendMessage(Component.text(ConfigManager.language.getMessage("prefix")).append(message));
+		receiver.sendMessage(
+				Component.text(getInstance().getConfig().getString("core.prefix", "§aRedFix » ")).append(message));
 	}
 	
 	public void registerCommand(String cmd, CommandExecutor handler) {
@@ -2151,21 +2151,6 @@ public class RedfixPlugin extends JavaPlugin {
 			sendMessage(sender, "§4Kein Todespunkt gespeichert");
 		}
 	}
-	
-	//@formatter:off
-	public void initLanguage() {
-		LanguageConfig language = ConfigManager.language;
-		language.registerMessages(LanguageConfig.Locale.DE, Map.ofEntries(
-				Map.entry("commandspy.prefix", "§cCommandSpy » "),
-				Map.entry("commandspy.command_enable", "§7CommandSpy wurde §eaktiviert"),
-				Map.entry("commandspy.command_disable", "§7CommandSpy wurde §edeaktiviert"),
-
-				Map.entry("prefix", "§4Red§eFix §a» §r"),
-				Map.entry("chat.shout.prefix", "§a[Shout] "),
-				Map.entry("chat.ask.prefix", "§9[Question] ")
-				));
-	}
-	//@formatter:on
 	
 	
 	public static void loadHomes(File file) {
