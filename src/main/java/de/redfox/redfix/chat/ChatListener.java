@@ -38,8 +38,11 @@ public class ChatListener implements Listener {
 			namePrefix = RedfixPlugin.getInstance().vaultChat.getPlayerPrefix(player);
 			nameSuffix = RedfixPlugin.getInstance().vaultChat.getPlayerSuffix(player);
 		}
-		String name = (namePrefix + player.getCustomName() + nameSuffix).replaceAll("&&", "&§§").replaceAll(
-				"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
+		String nm = player.getCustomName();
+		if (nm == null)
+			nm = player.getDisplayName();
+		String name = (namePrefix + nm + nameSuffix).replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
+				"§$1").replaceAll("&§§", "&");
 		if (event.getMessage().startsWith("!")) {
 			String msg = name + "§7 >> §r" + message.substring(1);
 			Bukkit.broadcastMessage(
