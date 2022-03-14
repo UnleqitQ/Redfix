@@ -54,6 +54,7 @@ public class WorthCalculator {
 		worthMap.put(Material.LAPIS_LAZULI, 50.0);
 		worthMap.put(Material.STRING, 5.0);
 		worthMap.put(Material.BONE, 2.0);
+		worthMap.put(Material.ANCIENT_DEBRIS, 300.0);
 	}
 	
 	public static void calculate(boolean setNan, boolean replace) {

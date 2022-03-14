@@ -57,10 +57,15 @@ public class ChatListener implements Listener {
 		}
 		else {
 			String msg = name + "§7 >> §r" + message;
-			double dist = RedfixPlugin.getInstance().getConfig().getDouble("chat.distance", 50);
-			Bukkit.getOnlinePlayers().stream().filter(
-					p -> (p.getWorld().equals(player.getWorld()) && p.getLocation().distance(
-							player.getLocation()) < dist)).forEach(p -> p.sendMessage(msg));
+			double dist = RedfixPlugin.getInstance().getConfig().getDouble("chat.distance", -1);
+			if (dist < 0) {
+				Bukkit.broadcastMessage(msg);
+			}
+			else {
+				Bukkit.getOnlinePlayers().stream().filter(
+						p -> (p.getWorld().equals(player.getWorld()) && p.getLocation().distance(
+								player.getLocation()) < dist)).forEach(p -> p.sendMessage(msg));
+			}
 		}
 	}
 	

@@ -7,8 +7,8 @@ commandspy:
   disable: "§7CommandSpy wurde §edeaktiviert"
 
 chat:
-  enabled: true
-  distance: 50
+  #-1 For disable
+  distance: -1
   shout:
     prefix: "§a[Shout] "
   ask:

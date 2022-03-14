@@ -11,6 +11,7 @@ import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.economy.VaultEconomy;
 import de.redfox.redfix.modules.*;
+import de.redfox.redfix.modules.inv.ChestManager;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
@@ -41,6 +42,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.help.HelpTopic;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -82,6 +84,8 @@ public class RedfixPlugin extends JavaPlugin {
 	public static Map<UUID, Deque<Location>> playerLocationHistory = new HashMap<>();
 	public static Map<UUID, Map<String, Home>> homes = new HashMap<>();
 	public static Map<String, Warp> warps = new HashMap<>();
+	
+	private static ChestManager chestManager;
 	
 	public RedfixPlugin() {
 		instance = this;
@@ -129,6 +133,8 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		new ChatListener();
 		
+		chestManager = new ChestManager();
+		
 		vaultEconomy = new VaultEconomy();
 		getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Normal);
 		
@@ -141,6 +147,7 @@ public class RedfixPlugin extends JavaPlugin {
 		saveWarps(new File(pluginPath, "warps.json"));
 		ProtocolLibrary.getProtocolManager().removePacketListeners(this);
 	}
+	
 	
 	public static void saveEco() {
 		EconomyManager.saveData(new File(pluginPath, "economy.json"));
@@ -1027,7 +1034,8 @@ public class RedfixPlugin extends JavaPlugin {
 						Bukkit.getScheduler().runTask(this, () -> {
 							Player player = (Player) commandContext.getSender();
 							Player target = commandContext.get("target");
-							new InvSee(player, target);
+							//new InvSee(player, target);
+							getRegChestManager().openInventory(player, target);
 						});
 					});
 			commandManager.register(builder);
@@ -1075,32 +1083,55 @@ public class RedfixPlugin extends JavaPlugin {
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
 			builder = builder.permission("redfix.command.spawnmob").argument(EntityTypeArgument.of("entity"),
-					"The Entity to spawn").argument(IntegerArgument.optional("count", 1)).handler(commandContext -> {
-				try {
-					Player player = (Player) commandContext.getSender();
-					EntityType type = commandContext.get("entity");
-					int count = commandContext.get("count");
-					Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
+					"The Entity to spawn").argument(IntegerArgument.optional("count", 1)).argument(
+					BooleanArgument.optional("relative", false)).argument(DoubleArgument.optional("dx", 0)).argument(
+					DoubleArgument.optional("dy", 0)).argument(DoubleArgument.optional("dz", 0)).handler(
+					commandContext -> {
+						try {
+							Player player = (Player) commandContext.getSender();
+							EntityType type = commandContext.get("entity");
+							int count = commandContext.get("count");
+							double dx = commandContext.get("dx");
+							double dy = commandContext.get("dy");
+							double dz = commandContext.get("dz");
+							boolean relative = commandContext.get("relative");
+							Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> {
 								/*RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
 										player.getEyeLocation().getDirection(), 50, FluidCollisionMode.SOURCE_ONLY,
 										true, 0, Predicates.alwaysFalse());*/
-						RayTraceResult result = player.rayTraceBlocks(50);
-						if (result == null) {
-							for (int i = 0; i < count; i++) {
-								player.getWorld().spawnEntity(player.getLocation(), type);
-							}
-						}
-						else {
-							Location pos = new Location(player.getWorld(), result.getHitPosition().getX(),
-									result.getHitPosition().getY(), result.getHitPosition().getZ());
-							for (int i = 0; i < count; i++) {
-								player.getWorld().spawnEntity(pos, type);
-							}
+								RayTraceResult result = player.rayTraceBlocks(50);
+								Location pos;
+								if (result == null) {
+									pos = player.getLocation().clone();
+								}
+								else {
+									pos = new Location(player.getWorld(), result.getHitPosition().getX(),
+											result.getHitPosition().getY(), result.getHitPosition().getZ());
+								}
+								Vector dir = player.getEyeLocation().getDirection();
+								double pitch = player.getEyeLocation().getPitch() / 180 * Math.PI;
+								double yaw = player.getEyeLocation().getYaw() / 180 * Math.PI;
+								Vector vecY = new Vector(Math.cos(pitch + Math.PI / 2) * Math.sin(yaw),
+										Math.sin(pitch + Math.PI / 2), Math.cos(pitch + Math.PI / 2) * Math.cos(yaw));
+								Vector vecX = new Vector(Math.sin(yaw + Math.PI / 2), 0, Math.cos(yaw + Math.PI / 2));
+								for (int i = 0; i < count; i++) {
+									if (relative) {
+										double vx = (Math.random() * 2 - 1) * dx;
+										double vy = (Math.random() * 2 - 1) * dy;
+										double vz = (Math.random() * 2 - 1) * dz;
+										Vector rz = dir.clone().multiply(vz);
+										Vector ry = vecY.clone().multiply(vy);
+										Vector rx = vecX.clone().multiply(vx);
+										player.getWorld().spawnEntity(pos.clone().add(rz).add(rx).add(ry), type);
+									}
+									else
+										player.getWorld().spawnEntity(pos.clone().add((Math.random() * 2 - 1) * dx,
+												(Math.random() * 2 - 1) * dy, (Math.random() * 2 - 1) * dz), type);
+								}
+							});
+						} catch (Exception ignored) {
 						}
 					});
-				} catch (Exception ignored) {
-				}
-			});
 			commandManager.register(builder);
 		}
 		
@@ -2038,7 +2069,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sendMessage(commandContext.getSender(), "§4Command not found");
 						}
 						else {
-							CommandContext c = new CommandContext(player, String.join(" ", args));
+							CommandContext c = new CommandContext(player, cmd + " " + String.join(" ", args));
 							node.executeIgnorePerms(c, args);
 						}
 					});
@@ -2062,19 +2093,32 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//SayAs
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("sayas").permission(
+					"redfix.command.sayas").argument(PlayerArgument.of("player")).argument(
+					StringArrayArgument.of("message"), "Message").handler(commandContext -> {
+				String[] msg = commandContext.get("message");
+				Player player = commandContext.get("player");
+				Bukkit.getScheduler().runTaskAsynchronously(this, () -> Bukkit.getPluginManager().callEvent(
+						new AsyncPlayerChatEvent(true, player, String.join(" ", msg),
+								new HashSet<>(Bukkit.getOnlinePlayers()))));
+			});
+			
+			commandManager.register(builder);
+		}
+		
 		for (CommandNode node : commandManager.getRootNodes().values()) {
 			commandManager.updateHelp(node);
 			HelpTopic helpTopic = node.getHelpTopic();
 		}
 		
-		//TODO: weather, clear
-		//TODO: killall, suicide, sudo
-		//TODO: msg, mail
-		//TODO: tp, tphere, tppos, tpall
+		//TODO: clear
+		//TODO: suicide
+		//TODO: mail
 		//TODO: tpa, tpahere, tpaall, tpaaccept, tpareject / tpadeny
-		//TODO: home, warp, invsee (see, see+edit)
 		//To Improve:
-		//TODO: ptime, pweather, time
+		//TODO: ptime, time
 	}
 	
 	public static void sendMessage(@NotNull CommandSender receiver, String message) {
@@ -2241,6 +2285,10 @@ public class RedfixPlugin extends JavaPlugin {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public ChestManager getRegChestManager() {
+		return chestManager;
 	}
 	
 }

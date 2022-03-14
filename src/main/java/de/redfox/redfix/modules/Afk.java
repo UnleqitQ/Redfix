@@ -66,6 +66,8 @@ public class Afk implements Listener, PacketListener {
 	}
 	
 	public static boolean isAfk(UUID player) {
+		if (!afkTimes.containsKey(player))
+			return false;
 		return System.currentTimeMillis() - afkTimes.get(player) > 5 * 60 * 1000;
 	}
 	
