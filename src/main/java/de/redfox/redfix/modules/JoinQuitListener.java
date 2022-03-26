@@ -10,12 +10,12 @@ public class JoinQuitListener implements Listener {
 	
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
-		event.joinMessage(Component.text("§e" + event.getPlayer() + " joined the game"));
+		event.joinMessage(Component.text("§e" + event.getPlayer().getDisplayName() + " joined the game"));
 	}
 	
 	@EventHandler
 	public void onQuit(PlayerQuitEvent event) {
-		event.quitMessage(Component.text("§e" + event.getPlayer() + " left the game"));
+		event.quitMessage(Component.text("§e" + event.getPlayer().getDisplayName() + " left the game"));
 	}
 	
 }

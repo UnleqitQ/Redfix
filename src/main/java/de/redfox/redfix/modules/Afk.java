@@ -10,6 +10,7 @@ import de.redfox.redfix.RedfixPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -74,13 +75,17 @@ public class Afk implements Listener, PacketListener {
 	public static void check() {
 		for (Map.Entry<UUID, Long> entry : afkTimes.entrySet()) {
 			if (isAfk(entry.getKey()) && !registered.contains(entry.getKey())) {
-				Bukkit.broadcastMessage("§7" + Bukkit.getPlayer(entry.getKey()).getName() + " is now AFK");
+				Player player = Bukkit.getPlayer(entry.getKey());
+				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.isVanished(p, player)).forEach(
+						p -> p.sendMessage("§7" + player.getName() + " is now AFK"));
 				registered.add(entry.getKey());
 				Bukkit.getPlayer(entry.getKey()).setSleepingIgnored(true);
 				
 			}
 			else if (!isAfk(entry.getKey()) && registered.contains(entry.getKey())) {
-				Bukkit.broadcastMessage("§7" + Bukkit.getPlayer(entry.getKey()).getName() + " is now back");
+				Player player = Bukkit.getPlayer(entry.getKey());
+				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.isVanished(p, player)).forEach(
+						p -> p.sendMessage("§7" + Bukkit.getPlayer(entry.getKey()).getName() + " is now back"));
 				registered.remove(entry.getKey());
 				Bukkit.getPlayer(entry.getKey()).setSleepingIgnored(false);
 			}

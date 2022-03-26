@@ -17,7 +17,6 @@ import de.redfox.redfix.modules.jail.JailedPlayer;
 import de.redfox.redfix.utils.PlayerWeatherType;
 import de.redfox.redfix.utils.WeatherType;
 import me.unleqitq.commandframework.CommandContext;
-import me.unleqitq.commandframework.CommandFramework;
 import me.unleqitq.commandframework.CommandManager;
 import me.unleqitq.commandframework.CommandNode;
 import me.unleqitq.commandframework.building.argument.*;
@@ -1104,10 +1103,10 @@ public class RedfixPlugin extends JavaPlugin {
 					List<String> pl = players.stream().filter(p -> {
 						if (commandContext.getSender() instanceof ConsoleCommandSender)
 							return true;
-						return !CommandFramework.isVanished(p) || VanishAPI.canSee((Player) commandContext.getSender(),
-								p);
+						return !isVanished((Player) commandContext.getSender(), p);
 					}).filter(p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName)).map(
-							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + vaultChat.getPlayerPrefix(
+							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + (isVanished(
+									p) ? "§7§o[Vanished] §f" : "§f") + vaultChat.getPlayerPrefix(
 									p) + p.getDisplayName() + vaultChat.getPlayerSuffix(p) + "§f").map(
 							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
 									"&")).toList();
@@ -1770,19 +1769,21 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					sender.sendMessage(
-							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
-									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
-									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-									"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					if (!isVanished((Player) commandContext.getSender(), player))
+						sender.sendMessage(
+								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
+										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
+										player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+										"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 				else {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
-							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					if (!isVanished((Player) commandContext.getSender(), player))
+						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
 			commandManager.register(builder);
@@ -1799,11 +1800,13 @@ public class RedfixPlugin extends JavaPlugin {
 					return;
 				}
 				UUID target = lastMessaged.get(sender.getUniqueId());
-				if (!Bukkit.getOfflinePlayer(target).isOnline()) {
+				Player player = Bukkit.getPlayer(target);
+				if (player == null) {
 					sendMessage(sender, "Der Spieler ist nicht online.");
 					return;
 				}
-				Player player = Bukkit.getPlayer(target);
+				if (isVanished(sender, player))
+					sendMessage(sender, "Der Spieler ist nicht online.");
 				
 				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
 					sb.append(s);
@@ -1816,19 +1819,21 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					sender.sendMessage(
-							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
-									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
-									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-									"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					if (!isVanished((Player) commandContext.getSender(), player))
+						sender.sendMessage(
+								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
+										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
+										player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+										"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 				else {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
-							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					if (!isVanished((Player) commandContext.getSender(), player))
+						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
+								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
 			});
 			commandManager.register(builder);
@@ -2594,6 +2599,15 @@ public class RedfixPlugin extends JavaPlugin {
 				"PremiumVanish")) {
 			if (VanishAPI.isInvisible(player))
 				return true;
+		}
+		return player.isInvisible();
+	}
+	
+	public static boolean isVanished(Player viewer, Player player) {
+		if (Bukkit.getPluginManager().isPluginEnabled("SuperVanish") || Bukkit.getPluginManager().isPluginEnabled(
+				"PremiumVanish")) {
+			if (VanishAPI.isInvisible(player))
+				return !VanishAPI.canSee(viewer, player);
 		}
 		return player.isInvisible();
 	}
