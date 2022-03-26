@@ -2,9 +2,8 @@ package de.redfox.redfix;
 
 import com.comphenix.protocol.ProtocolLibrary;
 import com.google.common.base.Predicates;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+import de.myzelyam.api.vanish.VanishAPI;
 import de.redfox.redfix.chat.ChatListener;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
@@ -18,6 +17,7 @@ import de.redfox.redfix.modules.jail.JailedPlayer;
 import de.redfox.redfix.utils.PlayerWeatherType;
 import de.redfox.redfix.utils.WeatherType;
 import me.unleqitq.commandframework.CommandContext;
+import me.unleqitq.commandframework.CommandFramework;
 import me.unleqitq.commandframework.CommandManager;
 import me.unleqitq.commandframework.CommandNode;
 import me.unleqitq.commandframework.building.argument.*;
@@ -26,6 +26,7 @@ import me.unleqitq.commandframework.building.flag.FrameworkFlag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.JoinConfiguration;
+import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.milkbowl.vault.chat.Chat;
@@ -39,6 +40,7 @@ import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
@@ -55,12 +57,11 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -71,11 +72,15 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	private static final int METRICS_ID = 14559;
 	
+	public static Gson gson = new GsonBuilder().setPrettyPrinting().create();
+	
 	private static RedfixPlugin instance;
 	public CommandSpy commandSpy;
 	public static final String pluginPath = "plugins/Redfix";
+	public static File saveDataFolder;
 	public Chat vaultChat;
 	public VaultEconomy vaultEconomy;
+	public Economy mainEconomy;
 	public Afk afk;
 	public static Map<UUID, Long> muted = new HashMap<>();
 	public static CommandManager commandManager;
@@ -100,6 +105,9 @@ public class RedfixPlugin extends JavaPlugin {
 		//WorthCalculator.reset();
 		//WorthCalculator.calculate();
 		
+		saveDataFolder = new File(getDataFolder(), "data");
+		saveDataFolder.mkdirs();
+		
 		ConfigManager.init();
 		
 		saveDefaultConfig();
@@ -107,13 +115,12 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		commandManager = new CommandManager(this);
 		
-		EconomyManager.loadData(new File(pluginPath, "economy.json"));
-		loadHomes(new File(pluginPath, "homes.json"));
-		loadWarps(new File(pluginPath, "warps.json"));
-		WorthCalculator.load(new File(pluginPath, "worth.yml"));
+		loadAll();
 		
 		afk = new Afk();
 		Bukkit.getPluginManager().registerEvents(afk, this);
+		Bukkit.getPluginManager().registerEvents(new JoinQuitListener(), this);
+		Bukkit.getPluginManager().registerEvents(new ColorListener(), this);
 		new God();
 		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
 		ProtocolLibrary.getProtocolManager().addPacketListener(afk);
@@ -125,6 +132,17 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		commandSpy = new CommandSpy();
 		commandSpy.load();
+		if (isEconomyEnabled()) {
+			vaultEconomy = new VaultEconomy();
+			getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Normal);
+			mainEconomy = vaultEconomy;
+		}
+		else {
+			RegisteredServiceProvider<Economy> rspE = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
+					Economy.class);
+			if (rspE != null)
+				mainEconomy = rspE.getProvider();
+		}
 		registerCommands();
 		RegisteredServiceProvider<Chat> rspC = RedfixPlugin.getInstance().getServer().getServicesManager().getRegistration(
 				Chat.class);
@@ -134,23 +152,41 @@ public class RedfixPlugin extends JavaPlugin {
 		new ChatListener();
 		
 		chestManager = new ChestManager();
-		
-		vaultEconomy = new VaultEconomy();
-		getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Normal);
-		
 	}
 	
 	@Override
 	public void onDisable() {
-		saveEco();
-		saveHomes(new File(pluginPath, "homes.json"));
-		saveWarps(new File(pluginPath, "warps.json"));
+		saveAll();
 		ProtocolLibrary.getProtocolManager().removePacketListeners(this);
 	}
 	
+	public static void saveAll() {
+		if (isEconomyEnabled())
+			saveEco();
+		saveHomes(new File(saveDataFolder, "homes.json"));
+		saveWarps(new File(saveDataFolder, "warps.json"));
+		saveDeathLocations(new File(saveDataFolder, "deathLocations.json"));
+		saveGod(new File(saveDataFolder, "god.json"));
+		saveLocationHistory(new File(saveDataFolder, "locationHistory.json"));
+		JailHandler.saveJails(new File(saveDataFolder, "jails.json"));
+		JailHandler.saveJailedPlayers(new File(saveDataFolder, "jailedPlayers.json"));
+	}
+	
+	public static void loadAll() {
+		if (isEconomyEnabled())
+			EconomyManager.loadData(new File(saveDataFolder, "economy.json"));
+		loadHomes(new File(saveDataFolder, "homes.json"));
+		loadWarps(new File(saveDataFolder, "warps.json"));
+		loadDeathLocations(new File(saveDataFolder, "deathLocations.json"));
+		loadGod(new File(saveDataFolder, "god.json"));
+		loadLocationHistory(new File(saveDataFolder, "locationHistory.json"));
+		WorthCalculator.load(new File(saveDataFolder, "worth.yml"));
+		JailHandler.loadJails(new File(saveDataFolder, "jails.json"));
+		JailHandler.loadJailedPlayers(new File(saveDataFolder, "jailedPlayers.json"));
+	}
 	
 	public static void saveEco() {
-		EconomyManager.saveData(new File(pluginPath, "economy.json"));
+		EconomyManager.saveData(new File(saveDataFolder, "economy.json"));
 	}
 	
 	private void registerCommands() {
@@ -1065,8 +1101,12 @@ public class RedfixPlugin extends JavaPlugin {
 				CommandSender sender = commandContext.getSender();
 				List<? extends Player> players = Bukkit.getOnlinePlayers().stream().toList();
 				for (String groupName : vaultChat.getGroups()) {
-					List<String> pl = players.stream().filter(
-							p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName)).map(
+					List<String> pl = players.stream().filter(p -> {
+						if (commandContext.getSender() instanceof ConsoleCommandSender)
+							return true;
+						return !CommandFramework.isVanished(p) || VanishAPI.canSee((Player) commandContext.getSender(),
+								p);
+					}).filter(p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName)).map(
 							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + vaultChat.getPlayerPrefix(
 									p) + p.getDisplayName() + vaultChat.getPlayerSuffix(p) + "§f").map(
 							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
@@ -1176,14 +1216,12 @@ public class RedfixPlugin extends JavaPlugin {
 					}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
 							"§$1").replaceAll("&§§", "&");
 					RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
-							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, true, 0,
+							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, false, 0,
 							Predicates.alwaysFalse());
 					if (result != null && result.getHitBlock() != null) {
 						Block block = result.getHitBlock();
-						if (block instanceof Sign) {
-							Sign sign = (Sign) block;
+						if (block instanceof Sign sign)
 							sign.setLine(line - 1, v);
-						}
 						else
 							sendMessage(player, "You are not looking at a sign");
 					}
@@ -1202,7 +1240,7 @@ public class RedfixPlugin extends JavaPlugin {
 				try {
 					Player player = (Player) commandContext.getSender();
 					RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
-							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, true, 0,
+							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, false, 0,
 							Predicates.alwaysFalse());
 					if (result != null && result.getHitBlock() != null) {
 						Block block = result.getHitBlock();
@@ -1399,7 +1437,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Bal
-		{
+		if (isEconomyEnabled()) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("balance", "bal", "money");
 			builder = builder.permission("redfix.command.balance").argument(
 					OfflinePlayerArgument.of("player").optional(), "player").handler(commandContext -> {
@@ -1412,7 +1450,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Baltop
-		{
+		if (isEconomyEnabled()) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("balancetop", "baltop");
 			builder = builder.permission("redfix.command.balancetop").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
@@ -1430,7 +1468,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Economy
-		{
+		if (isEconomyEnabled()) {
 			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder("economy", "eco");
 			
 			FrameworkCommand.Builder<CommandSender> setBuilder = topBuilder.subCommand("set").permission(
@@ -1484,7 +1522,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Pay
-		{
+		if (isEconomyEnabled()) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("pay").argument(
 					OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount")).handler(
 					commandContext -> {
@@ -1732,7 +1770,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					player.sendMessage(
+					sender.sendMessage(
 							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
 									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
 									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
@@ -1742,7 +1780,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					player.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+					sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
 							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
@@ -1778,7 +1816,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					player.sendMessage(
+					sender.sendMessage(
 							("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
 									player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
 									player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
@@ -1788,7 +1826,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					player.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
+					sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
 							player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
@@ -1824,7 +1862,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Worth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("worth").permission(
 					"redfix.command.worth.get").argument(MaterialArgument.of("material")).handler(commandContext -> {
 				Material material = commandContext.get("material");
@@ -1841,7 +1879,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//DefaultWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder(
 					"defaultworth").permission("redfix.command.worth.default").handler(commandContext -> {
 				WorthCalculator.setToDefault();
@@ -1852,7 +1890,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//ClearWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("clearworth").permission(
 					"redfix.command.worth.clear").handler(commandContext -> {
 				WorthCalculator.clear();
@@ -1863,7 +1901,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SetWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("setworth").permission(
 					"redfix.command.worth.set").argument(MaterialArgument.of("material")).argument(
 					DoubleArgument.of("value")).handler(commandContext -> {
@@ -1878,7 +1916,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//LoadWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("loadworth").permission(
 					"redfix.command.worth.load").handler(commandContext -> {
 				WorthCalculator.load(new File(pluginPath, "worth.yml"));
@@ -1889,7 +1927,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SaveWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("saveworth").permission(
 					"redfix.command.worth.save").handler(commandContext -> {
 				WorthCalculator.save(new File(pluginPath, "worth.yml"));
@@ -1900,7 +1938,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//CalculateWorth
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder(
 					"calculateworth").permission("redfix.command.worth.calculate").argument(IntegerArgument.of("loops"),
 					"Loops of calculating (-1 for also saving not calculatable)").argument(
@@ -1925,7 +1963,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Sell
-		{
+		if (mainEconomy != null) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("sell").permission(
 					"redfix.command.sell").handler(commandContext -> {
 				Player sender = (Player) commandContext.getSender();
@@ -1945,7 +1983,8 @@ public class RedfixPlugin extends JavaPlugin {
 					double cnt = sender.getInventory().getItemInMainHand().getAmount();
 					sender.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
 					double pay = val * cnt * (1 - getConfig().getDouble("economy.sellFee", 0.2));
-					EconomyManager.addMoney(sender.getUniqueId(), pay);
+					//EconomyManager.addMoney(sender.getUniqueId(), pay);
+					mainEconomy.depositPlayer(sender, pay);
 					sendMessage(sender, "You received for selling " + vaultEconomy.format(pay));
 				}
 			});
@@ -2108,6 +2147,44 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//Ip
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ip").permission(
+					"redfix.command.ip").argument(PlayerArgument.of("player")).handler(commandContext -> {
+				Player player = commandContext.get("player");
+				sendMessage(commandContext.getSender(), "Ip of " + player.getName() + ": " + player.getAddress());
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		//Ping
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ping").permission(
+					"redfix.command.ping").argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
+				Player player = commandContext.getOrSupplyDefault("player", () -> (Player) commandContext.getSender());
+				sendMessage(commandContext.getSender(),
+						"Ping of " + player.getName() + ": " + player.getPing() + " ms");
+			});
+			
+			commandManager.register(builder);
+		}
+		
+		/*//Book
+		{
+			FrameworkCommand.Builder<Player> topBuilder = FrameworkCommand.playerCommandBuilder("book");
+			commandManager.register(
+					topBuilder.subCommand("unsign").permission("redfix.command.book.unsign").handler(c -> {
+						Player player = (Player) c.getSender();
+						if (player.getInventory().getItemInMainHand().getItemMeta() instanceof BookMeta meta) {
+							meta.
+						}
+						else {
+							sendMessage(player, "You are not holding a book");
+						}
+					}));
+		}*/
+		
 		for (CommandNode node : commandManager.getRootNodes().values()) {
 			commandManager.updateHelp(node);
 			HelpTopic helpTopic = node.getHelpTopic();
@@ -2145,12 +2222,19 @@ public class RedfixPlugin extends JavaPlugin {
 		playerLocationHistory.get(player.getUniqueId()).add(player.getLocation());
 	}
 	
+	public static void addToHistory(UUID player, Location location) {
+		if (!playerLocationHistory.containsKey(player)) {
+			playerLocationHistory.put(player, new ConcurrentLinkedDeque<>());
+		}
+		playerLocationHistory.get(player).add(location);
+	}
+	
 	public static void addHome(Player player, String name) {
 		if (!homes.containsKey(player.getUniqueId())) {
 			homes.put(player.getUniqueId(), new HashMap<>());
 		}
 		homes.get(player.getUniqueId()).put(name, new Home(name, player.getLocation(), player.getUniqueId()));
-		saveHomes(new File(pluginPath, "homes.json"));
+		saveHomes(new File(saveDataFolder, "homes.json"));
 	}
 	
 	public static void addHome(Home home) {
@@ -2162,7 +2246,7 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void addWarp(Player player, String name) {
 		warps.put(name, new Warp(name, player.getLocation()));
-		saveWarps(new File(pluginPath, "warps.json"));
+		saveWarps(new File(saveDataFolder, "warps.json"));
 	}
 	
 	public static void addWarp(Warp warp) {
@@ -2199,12 +2283,14 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void loadHomes(File file) {
 		file.getParentFile().mkdirs();
-		try {
-			file.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
 		JsonArray array;
 		try {
 			FileInputStream fis = new FileInputStream(file);
@@ -2225,17 +2311,19 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void saveHomes(File file) {
 		file.getParentFile().mkdirs();
-		try {
-			file.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
 		JsonArray array = new JsonArray();
 		homes.values().forEach(m0 -> m0.values().forEach(h -> array.add(h.save())));
 		try {
 			FileOutputStream fos = new FileOutputStream(file);
-			fos.write(array.toString().getBytes());
+			fos.write(gson.toJson(array).getBytes());
 			fos.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -2244,12 +2332,14 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void loadWarps(File file) {
 		file.getParentFile().mkdirs();
-		try {
-			file.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
 		JsonArray array;
 		try {
 			FileInputStream fis = new FileInputStream(file);
@@ -2270,17 +2360,199 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public static void saveWarps(File file) {
 		file.getParentFile().mkdirs();
-		try {
-			file.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
 		JsonArray array = new JsonArray(warps.size());
 		warps.values().forEach(w -> array.add(w.save()));
 		try {
 			FileOutputStream fos = new FileOutputStream(file);
-			fos.write(array.toString().getBytes());
+			fos.write(gson.toJson(array).getBytes());
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void loadGod(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object;
+		try {
+			FileInputStream fis = new FileInputStream(file);
+			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
+			fis.close();
+		} catch (IOException | IllegalStateException e) {
+			e.printStackTrace();
+			return;
+		}
+		try {
+			for (String key : object.keySet()) {
+				/*Boolean[] bs = new Boolean[object.getAsJsonArray(key).size()];
+				for (int i = 0; i < bs.length; i++) {
+					bs[i] = object.getAsJsonArray(key).get(i).getAsBoolean();
+				}*/
+				Boolean[] bs = object.getAsJsonPrimitive(key).getAsString().chars().mapToObj(i -> i > 0).toArray(
+						Boolean[]::new);
+				God.players.put(UUID.fromString(key), bs);
+			}
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public static void saveGod(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object = new JsonObject();
+		God.players.forEach((key, value) -> {
+			//JsonArray array = new JsonArray();
+			//Arrays.stream(value).forEach(array::add);
+			String s = new String(Arrays.stream(value).mapToInt(b -> b ? 1 : 0).toArray(), 0, value.length);
+			object.addProperty(key.toString(), s);
+		});
+		try {
+			FileOutputStream fos = new FileOutputStream(file);
+			fos.write(gson.toJson(object).getBytes());
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void loadDeathLocations(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object;
+		try {
+			FileInputStream fis = new FileInputStream(file);
+			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
+			fis.close();
+		} catch (IOException | IllegalStateException e) {
+			e.printStackTrace();
+			return;
+		}
+		try {
+			for (String key : object.keySet()) {
+				JsonArray array = object.getAsJsonArray(key);
+				array.forEach(o -> addToHistory(UUID.fromString(key),
+						new Location(Bukkit.getWorld(UUID.fromString(o.getAsJsonObject().get("world").getAsString())),
+								o.getAsJsonObject().get("x").getAsDouble(), o.getAsJsonObject().get("y").getAsDouble(),
+								o.getAsJsonObject().get("z").getAsDouble())));
+			}
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public static void saveDeathLocations(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object = new JsonObject();
+		playerDeathLocations.forEach((key, value) -> {
+			JsonObject o = new JsonObject();
+			o.addProperty("world", value.getWorld().getUID().toString());
+			o.addProperty("x", value.getX());
+			o.addProperty("y", value.getY());
+			o.addProperty("z", value.getZ());
+			object.add(key.toString(), o);
+		});
+		try {
+			FileOutputStream fos = new FileOutputStream(file);
+			fos.write(gson.toJson(object).getBytes());
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void loadLocationHistory(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object;
+		try {
+			FileInputStream fis = new FileInputStream(file);
+			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
+			fis.close();
+		} catch (IOException | IllegalStateException e) {
+			e.printStackTrace();
+			return;
+		}
+		try {
+			for (String key : object.keySet()) {
+				JsonObject o = object.getAsJsonObject(key);
+				addToHistory(UUID.fromString(key),
+						new Location(Bukkit.getWorld(UUID.fromString(o.get("world").getAsString())),
+								o.get("x").getAsDouble(), o.get("y").getAsDouble(), o.get("z").getAsDouble()));
+			}
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public static void saveLocationHistory(File file) {
+		file.getParentFile().mkdirs();
+		if (!file.exists())
+			try {
+				file.createNewFile();
+				return;
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		JsonObject object = new JsonObject();
+		playerLocationHistory.forEach((key, value) -> {
+			JsonArray array = new JsonArray();
+			value.forEach(p -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("world", p.getWorld().getUID().toString());
+				o.addProperty("x", p.getX());
+				o.addProperty("y", p.getY());
+				o.addProperty("z", p.getZ());
+				array.add(o);
+			});
+			object.add(key.toString(), array);
+		});
+		try {
+			FileOutputStream fos = new FileOutputStream(file);
+			fos.write(gson.toJson(object).getBytes());
 			fos.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -2289,6 +2561,41 @@ public class RedfixPlugin extends JavaPlugin {
 	
 	public ChestManager getRegChestManager() {
 		return chestManager;
+	}
+	
+	public static byte[] serializeBukkitObject(Object o) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		BukkitObjectOutputStream os = new BukkitObjectOutputStream(baos);
+		os.writeObject(o);
+		os.close();
+		return baos.toByteArray();
+	}
+	
+	public static Object deserializeBukkitObject(byte[] bytes) throws IOException, ClassNotFoundException {
+		ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+		BukkitObjectInputStream is = new BukkitObjectInputStream(bais);
+		Object o = is.readObject();
+		is.close();
+		return o;
+	}
+	
+	public static Component applyColor(Component in) {
+		return in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build()).replaceText(
+				TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build()).replaceText(
+				TextReplacementConfig.builder().match("&§§").replacement("&").build());
+	}
+	
+	public static boolean isEconomyEnabled() {
+		return getInstance().getConfig().getBoolean("economy.enabled");
+	}
+	
+	public static boolean isVanished(Player player) {
+		if (Bukkit.getPluginManager().isPluginEnabled("SuperVanish") || Bukkit.getPluginManager().isPluginEnabled(
+				"PremiumVanish")) {
+			if (VanishAPI.isInvisible(player))
+				return true;
+		}
+		return player.isInvisible();
 	}
 	
 }

@@ -11,10 +11,13 @@ chat:
   distance: -1
   shout:
     prefix: "§a[Shout] "
+    name: "Shout"
   ask:
     prefix: "§9[Question] "
+    name: "Question"
 
 economy:
+  enabled: true
   symbol: "$"
   name:
     singular: "Dollar"

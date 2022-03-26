@@ -1,5 +1,6 @@
 package de.redfox.redfix.modules.jail;
 
+import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.Statistic;
 
@@ -11,6 +12,13 @@ public class JailedPlayer {
 	public String jail;
 	public int jailed;
 	public int duration;
+	
+	private JailedPlayer(UUID player, String jail, int duration, int jailed) {
+		this.jail = jail;
+		this.player = player;
+		this.duration = duration;
+		this.jailed = jailed;
+	}
 	
 	public JailedPlayer(UUID player, String jail, int duration) {
 		this.jail = jail;
@@ -30,6 +38,20 @@ public class JailedPlayer {
 	
 	public Jail getJail() {
 		return JailHandler.jails.get(jail);
+	}
+	
+	public static JailedPlayer load(JsonObject object) {
+		return new JailedPlayer(UUID.fromString(object.get("player").getAsString()), object.get("jail").getAsString(),
+				object.get("duration").getAsInt(), object.get("jailed").getAsInt());
+	}
+	
+	public JsonObject save() {
+		JsonObject object = new JsonObject();
+		object.addProperty("player", player.toString());
+		object.addProperty("jail", jail);
+		object.addProperty("jailed", jailed);
+		object.addProperty("duration", duration);
+		return object;
 	}
 	
 }

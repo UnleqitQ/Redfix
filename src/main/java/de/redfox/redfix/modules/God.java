@@ -1,5 +1,6 @@
 package de.redfox.redfix.modules;
 
+import com.google.gson.JsonObject;
 import de.redfox.redfix.RedfixPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.EntityType;

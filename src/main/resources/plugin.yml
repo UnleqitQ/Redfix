@@ -8,6 +8,8 @@ depend:
   - ProtocolLib
 softdepend:
   - Vault
+  - SuperVanish
+  - PremiumVanish
 
 permissions:
   redfix.command.commandspy:
