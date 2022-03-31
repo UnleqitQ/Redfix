@@ -120,6 +120,7 @@ public class RedfixPlugin extends JavaPlugin {
 		Bukkit.getPluginManager().registerEvents(afk, this);
 		Bukkit.getPluginManager().registerEvents(new JoinQuitListener(), this);
 		Bukkit.getPluginManager().registerEvents(new ColorListener(), this);
+		Bukkit.getPluginManager().registerEvents(new InstaBreak(), this);
 		new God();
 		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
 		ProtocolLibrary.getProtocolManager().addPacketListener(afk);
@@ -299,6 +300,31 @@ public class RedfixPlugin extends JavaPlugin {
 									new Boolean[]{commandContext.getFlag("silent"), commandContext.getFlag(
 											"notarget")});
 							sendMessage(sender, "Enabled God");
+						}
+					});
+			commandManager.register(builder);
+		}
+		
+		//InstaBreak
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("instabreak");
+			builder = builder.permission("redfix.command.instabreak").flag(
+							FrameworkFlag.of("silk").setDescription("The block always drops as itself")).flag(
+							FrameworkFlag.of("force").setDescription("Even break barrier")).argument(
+							PlayerArgument.of("player").optional(), "player")
+					//.argument(PlayerArgument.of("player"))
+					.handler(commandContext -> {
+						CommandSender sender = commandContext.getSender();
+						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						if (InstaBreak.players.containsKey(target.getUniqueId())) {
+							InstaBreak.players.remove(target.getUniqueId());
+							sendMessage(sender, "Disabled InstaBreak");
+						}
+						else {
+							InstaBreak.players.put(target.getUniqueId(),
+									(byte) ((commandContext.getFlag("silk") ? 0b10 : 0) | (commandContext.getFlag(
+											"force") ? 0b01 : 0)));
+							sendMessage(sender, "Enabled InstaBreak");
 						}
 					});
 			commandManager.register(builder);
@@ -1113,7 +1139,7 @@ public class RedfixPlugin extends JavaPlugin {
 					List<String> pl = players.stream().filter(p -> {
 						if (commandContext.getSender() instanceof ConsoleCommandSender)
 							return true;
-						return !isVanished((Player) commandContext.getSender(), p);
+						return canSee((Player) commandContext.getSender(), p);
 					}).filter(p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName)).map(
 							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + (isVanished(
 									p) ? "§7§o[Vanished] §f" : "§f") + vaultChat.getPlayerPrefix(
@@ -1794,7 +1820,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					if (!isVanished((Player) commandContext.getSender(), player))
+					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(
 								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
 										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
@@ -1805,7 +1831,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					if (!isVanished((Player) commandContext.getSender(), player))
+					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
 								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
@@ -1830,7 +1856,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(sender, "Der Spieler ist nicht online.");
 					return;
 				}
-				if (isVanished(sender, player))
+				if (!canSee(sender, player))
 					sendMessage(sender, "Der Spieler ist nicht online.");
 				
 				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
@@ -1844,7 +1870,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
 							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					if (!isVanished((Player) commandContext.getSender(), player))
+					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(
 								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
 										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
@@ -1855,7 +1881,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
 							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
-					if (!isVanished((Player) commandContext.getSender(), player))
+					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
 								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
@@ -2638,6 +2664,15 @@ public class RedfixPlugin extends JavaPlugin {
 				return !VanishAPI.canSee(viewer, player);
 		}
 		return player.isInvisible();
+	}
+	
+	public static boolean canSee(Player viewer, Player player) {
+		if (Bukkit.getPluginManager().isPluginEnabled("SuperVanish") || Bukkit.getPluginManager().isPluginEnabled(
+				"PremiumVanish")) {
+			if (VanishAPI.isInvisible(player))
+				return VanishAPI.canSee(viewer, player);
+		}
+		return !player.isInvisible();
 	}
 	
 }

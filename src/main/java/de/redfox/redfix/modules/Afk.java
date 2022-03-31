@@ -76,7 +76,7 @@ public class Afk implements Listener, PacketListener {
 		for (Map.Entry<UUID, Long> entry : afkTimes.entrySet()) {
 			if (isAfk(entry.getKey()) && !registered.contains(entry.getKey())) {
 				Player player = Bukkit.getPlayer(entry.getKey());
-				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.isVanished(p, player)).forEach(
+				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.canSee(p, player)).forEach(
 						p -> p.sendMessage("§7" + player.getName() + " is now AFK"));
 				registered.add(entry.getKey());
 				Bukkit.getPlayer(entry.getKey()).setSleepingIgnored(true);
@@ -84,7 +84,7 @@ public class Afk implements Listener, PacketListener {
 			}
 			else if (!isAfk(entry.getKey()) && registered.contains(entry.getKey())) {
 				Player player = Bukkit.getPlayer(entry.getKey());
-				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.isVanished(p, player)).forEach(
+				Bukkit.getOnlinePlayers().stream().filter(p -> RedfixPlugin.canSee(p, player)).forEach(
 						p -> p.sendMessage("§7" + Bukkit.getPlayer(entry.getKey()).getName() + " is now back"));
 				registered.remove(entry.getKey());
 				Bukkit.getPlayer(entry.getKey()).setSleepingIgnored(false);
