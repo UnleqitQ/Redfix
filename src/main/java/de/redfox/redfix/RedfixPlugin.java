@@ -19,6 +19,7 @@ import de.redfox.redfix.utils.WeatherType;
 import me.unleqitq.commandframework.CommandContext;
 import me.unleqitq.commandframework.CommandManager;
 import me.unleqitq.commandframework.CommandNode;
+import me.unleqitq.commandframework.CommandUtils;
 import me.unleqitq.commandframework.building.argument.*;
 import me.unleqitq.commandframework.building.command.FrameworkCommand;
 import me.unleqitq.commandframework.building.flag.FrameworkFlag;
@@ -44,7 +45,6 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.help.HelpTopic;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -1041,6 +1041,11 @@ public class RedfixPlugin extends JavaPlugin {
 						Bukkit.getScheduler().runTask(this, () -> {
 							Player player = (Player) commandContext.getSender();
 							Player target = commandContext.getOrDefault("target", player);
+							if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
+									"redfix.command.ec.others")) {
+								CommandUtils.printMissingPermission(player, "redfix.command.ec.others");
+								return;
+							}
 							player.openInventory(target.getEnderChest());
 						});
 					});
@@ -1083,6 +1088,11 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						Player player = (Player) commandContext.getSender();
 						Player target = commandContext.getOrDefault("target", player);
+						if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
+								"redfix.command.afk.others")) {
+							CommandUtils.printMissingPermission(player, "redfix.command.afk.others");
+							return;
+						}
 						if (Afk.isAfk(target.getUniqueId())) {
 							Afk.afkTimes.put(target.getUniqueId(), System.currentTimeMillis());
 						}
@@ -1442,6 +1452,11 @@ public class RedfixPlugin extends JavaPlugin {
 					OfflinePlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				OfflinePlayer target = commandContext.getOrDefault("player", player);
+				if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
+						"redfix.command.bal.others")) {
+					CommandUtils.printMissingPermission(player, "redfix.command.bal.others");
+					return;
+				}
 				sendMessage(player, "§aBalance of " + target.getName() + ": " + EconomyManager.getMoney(
 						target.getUniqueId()) + getConfig().getString("economy.symbol", "$"));
 			});
@@ -1641,6 +1656,11 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						Player sender = (Player) commandContext.getSender();
 						Player target = commandContext.getOrDefault("target", sender);
+						if (!sender.getUniqueId().equals(target.getUniqueId()) && !sender.hasPermission(
+								"redfix.command.tp.back.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.tp.back.others");
+							return;
+						}
 						Bukkit.getScheduler().runTask(this, () -> pollHistory(target, sender));
 					});
 			commandManager.register(builder);
@@ -1653,6 +1673,11 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						Player sender = (Player) commandContext.getSender();
 						Player target = commandContext.getOrDefault("target", sender);
+						if (!sender.getUniqueId().equals(target.getUniqueId()) && !sender.hasPermission(
+								"redfix.command.tp.dback.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.tp.dback.others");
+							return;
+						}
 						Bukkit.getScheduler().runTask(this, () -> pollDeath(target, sender));
 					});
 			commandManager.register(builder);
@@ -1838,6 +1863,8 @@ public class RedfixPlugin extends JavaPlugin {
 			});
 			commandManager.register(builder);
 		}
+		
+		//Experience
 		
 		//Me
 		{
@@ -2168,6 +2195,11 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ping").permission(
 					"redfix.command.ping").argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
 				Player player = commandContext.getOrSupplyDefault("player", () -> (Player) commandContext.getSender());
+				if (!commandContext.getSender().equals(player) && !commandContext.getSender().hasPermission(
+						"redfix.command.ping.others")) {
+					CommandUtils.printMissingPermission(commandContext.getSender(), "redfix.command.ping.others");
+					return;
+				}
 				sendMessage(commandContext.getSender(),
 						"Ping of " + player.getName() + ": " + player.getPing() + " ms");
 			});
@@ -2190,10 +2222,6 @@ public class RedfixPlugin extends JavaPlugin {
 					}));
 		}*/
 		
-		for (CommandNode node : commandManager.getRootNodes().values()) {
-			commandManager.updateHelp(node);
-			HelpTopic helpTopic = node.getHelpTopic();
-		}
 		
 		//TODO: clear
 		//TODO: suicide
