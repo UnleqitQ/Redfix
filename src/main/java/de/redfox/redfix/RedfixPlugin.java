@@ -1147,7 +1147,7 @@ public class RedfixPlugin extends JavaPlugin {
 							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
 									"&")).toList();
 					if (pl.size() > 0) {
-						sender.sendMessage("§6" + groupName + ": " + String.join(", ", pl));
+						sender.sendMessage("§6" + groupName+" §f("+pl.size()+")§6: " + String.join(", ", pl));
 					}
 				}
 			});
