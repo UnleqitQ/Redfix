@@ -25,3 +25,9 @@ economy:
   startMoney: 100
   distance: 50
   sellFee: 0.2
+
+commands:
+  home:
+    cooldown: 10
+  warp:
+    cooldown: 10

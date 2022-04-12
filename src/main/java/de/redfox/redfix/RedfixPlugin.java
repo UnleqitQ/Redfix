@@ -208,11 +208,12 @@ public class RedfixPlugin extends JavaPlugin {
 				Player sender = (Player) commandContext.getSender();
 				if (JailHandler.jails.containsKey(commandContext.getArgument("name"))) {
 					sendMessage(sender, "A jail with this name already exists");
-					return;
+					return false;
 				}
 				Jail jail = new Jail(commandContext.getArgument("name"), sender.getLocation().getBlock().getLocation());
 				JailHandler.jails.put(jail.name, jail);
 				sendMessage(sender, "Created jail \"" + jail.name + "\"");
+				return true;
 			});
 			
 			StringArgument.Builder jailArgument = (StringArgument.Builder) StringArgument.of("name").tabComplete(
@@ -225,10 +226,11 @@ public class RedfixPlugin extends JavaPlugin {
 						CommandSender sender = (CommandSender) commandContext.getSender();
 						if (!JailHandler.jails.containsKey(commandContext.getArgument("name"))) {
 							sendMessage(sender, "This jail does not exist");
-							return;
+							return false;
 						}
 						JailHandler.jails.remove(commandContext.getArgument("name"));
 						sendMessage(sender, "Removed jail \"" + commandContext.getArgument("name") + "\"");
+						return true;
 					});
 			
 			FrameworkCommand.Builder<CommandSender> jailBuilder = topBuilder.subCommand("jail").permission(
@@ -242,11 +244,11 @@ public class RedfixPlugin extends JavaPlugin {
 						int duration = commandContext.getArgument("duration");
 						if (duration == -1 && !sender.hasPermission("redfix.jail.jail.permanent")) {
 							sendMessage(sender, "I'm sorry, but you don't have the permission to jail permanently");
-							return;
+							return false;
 						}
 						if (!JailHandler.jails.containsKey(name)) {
 							sendMessage(sender, "This jail does not exist");
-							return;
+							return false;
 						}
 						
 						JailedPlayer jp = new JailedPlayer(player.getUniqueId(), name, duration);
@@ -257,6 +259,7 @@ public class RedfixPlugin extends JavaPlugin {
 								"You jailed " + player.getName() + ((duration != -1) ? " for " + duration + " seconds" : ""));
 						sendMessage(player,
 								"You got jailed" + ((duration != -1) ? " for " + duration + " seconds" : ""));
+						return true;
 					});
 			
 			FrameworkCommand.Builder<CommandSender> freeBuilder = topBuilder.subCommand("unjail").permission(
@@ -266,12 +269,13 @@ public class RedfixPlugin extends JavaPlugin {
 						Player player = commandContext.getArgument("player");
 						if (!JailHandler.jailedPlayers.containsKey(player.getUniqueId())) {
 							sendMessage(sender, "This player is not jailed");
-							return;
+							return false;
 						}
 						
 						sendMessage(sender, "You freed " + player.getName());
 						JailHandler.jailedPlayers.remove(player.getUniqueId());
 						sendMessage(player, "You got freed");
+						return true;
 					});
 			
 			commandManager.register(createBuilder);
@@ -301,6 +305,7 @@ public class RedfixPlugin extends JavaPlugin {
 											"notarget")});
 							sendMessage(sender, "Enabled God");
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -326,6 +331,7 @@ public class RedfixPlugin extends JavaPlugin {
 											"force") ? 0b01 : 0)));
 							sendMessage(sender, "Enabled InstaBreak");
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -347,6 +353,7 @@ public class RedfixPlugin extends JavaPlugin {
 				if (commandContext.getFlag("particle")) {
 					target.getWorld().spawnParticle(Particle.HEART, target.getLocation().clone().add(0, 1.5, 0), 1);
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -362,6 +369,7 @@ public class RedfixPlugin extends JavaPlugin {
 				target.setSaturation(20);
 				target.setFoodLevel(20);
 				sendMessage(target, "Your stomach is full");
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -375,6 +383,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				target.setAllowFlight(!target.getAllowFlight());
 				sendMessage(sender, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -416,12 +425,13 @@ public class RedfixPlugin extends JavaPlugin {
 				GameMode gameMode = values.get(commandContext.get("gamemode"));
 				if (gameMode == null) {
 					sendMessage(sender, "Please use a valid gamemode");
-					return;
+					return false;
 				}
 				Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(), () -> target.setGameMode(gameMode));
 				sendMessage(target,
 						"Switched GameMode to " + gameMode.name().substring(0, 1) + gameMode.name().substring(
 								1).toLowerCase());
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -444,6 +454,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.resetPlayerTime();
 					sendMessage(player, "Reset player time");
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -461,6 +472,7 @@ public class RedfixPlugin extends JavaPlugin {
 						WeatherType weatherType = commandContext.get("weather");
 						player.getWorld().setStorm(weatherType != WeatherType.CLEAR);
 						player.getWorld().setThundering(weatherType == WeatherType.THUNDER);
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -486,6 +498,7 @@ public class RedfixPlugin extends JavaPlugin {
 							player.resetPlayerWeather();
 							sendMessage(player, "Reset player weather");
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -499,6 +512,7 @@ public class RedfixPlugin extends JavaPlugin {
 						int time = commandContext.get("time");
 						player.getWorld().setFullTime(time);
 						sendMessage(player, "Set time");
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -512,6 +526,7 @@ public class RedfixPlugin extends JavaPlugin {
 				String name = commandContext.getArgument("name");
 				addHome(player, name);
 				sendMessage(player, "Created Home");
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -519,23 +534,25 @@ public class RedfixPlugin extends JavaPlugin {
 		//Home
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("home");
-			builder = builder.permission("redfix.command.home").argument(
-					StringArgument.of("name").tabComplete((c, a) -> {
-						if (!homes.containsKey(((Player) c.getSender()).getUniqueId())) {
-							homes.put(((Player) c.getSender()).getUniqueId(), new HashMap<>());
-						}
-						return homes.get(((Player) c.getSender()).getUniqueId()).keySet().stream().filter(
-								s -> s.toLowerCase().startsWith(a.toLowerCase())).toList();
-					}), "Home name").handler(commandContext -> {
+			builder = builder.permission("redfix.command.home").cooldown(
+					getConfig().getInt("commands.home.cooldown", 10) * 20,
+					"redfix.command.home.bypassCooldown").argument(StringArgument.of("name").tabComplete((c, a) -> {
+				if (!homes.containsKey(((Player) c.getSender()).getUniqueId())) {
+					homes.put(((Player) c.getSender()).getUniqueId(), new HashMap<>());
+				}
+				return homes.get(((Player) c.getSender()).getUniqueId()).keySet().stream().filter(
+						s -> s.toLowerCase().startsWith(a.toLowerCase())).toList();
+			}), "Home name").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
 				String name = commandContext.getArgument("name");
 				Home home = homes.get(player.getUniqueId()).get(name);
 				if (home == null) {
 					sendMessage(player, "Did not find home");
-					return;
+					return false;
 				}
 				addToHistory(player);
 				player.teleport(home.pos);
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -553,6 +570,7 @@ public class RedfixPlugin extends JavaPlugin {
 									HoverEvent.showText(Component.text("Teleport to " + h))).clickEvent(
 									ClickEvent.runCommand("/home " + h))).toArray(ComponentLike[]::new)));
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -566,6 +584,7 @@ public class RedfixPlugin extends JavaPlugin {
 				String name = commandContext.getArgument("name");
 				addWarp(player, name);
 				sendMessage(player, "Created Warp");
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -573,7 +592,9 @@ public class RedfixPlugin extends JavaPlugin {
 		//Warp
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warp");
-			builder = builder.permission("redfix.command.warp").argument(StringArgument.of("name").tabComplete(
+			builder = builder.permission("redfix.command.warp").cooldown(
+					getConfig().getInt("commands.warp.cooldown", 10) * 20,
+					"redfix.command.warp.bypassCooldown").argument(StringArgument.of("name").tabComplete(
 					(c, a) -> warps.keySet().stream().filter(
 							s -> s.toLowerCase().startsWith(a.toLowerCase())).toList()), "Warp name").handler(
 					commandContext -> {
@@ -582,10 +603,11 @@ public class RedfixPlugin extends JavaPlugin {
 						Warp warp = warps.get(name);
 						if (warp == null) {
 							sendMessage(player, "Did not find warp");
-							return;
+							return false;
 						}
 						addToHistory(player);
 						player.teleport(warp.pos);
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -602,6 +624,7 @@ public class RedfixPlugin extends JavaPlugin {
 							warps.keySet().stream().map(w -> Component.text(w).hoverEvent(
 									HoverEvent.showText(Component.text("Teleport to " + w))).clickEvent(
 									ClickEvent.runCommand("/warp " + w))).toArray(ComponentLike[]::new)));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -621,6 +644,7 @@ public class RedfixPlugin extends JavaPlugin {
 						new AttributeModifier("redfix", speed - 1, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
 				player.setWalkSpeed(0.2f);
 				sendMessage(player, "Set walk speed to " + speed);
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -636,6 +660,7 @@ public class RedfixPlugin extends JavaPlugin {
 				float speed = commandContext.get("speed");
 				player.setFlySpeed(speed / 10);
 				sendMessage(player, "Set fly speed to " + speed);
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -662,6 +687,7 @@ public class RedfixPlugin extends JavaPlugin {
 					player.setWalkSpeed(0.2f);
 					sendMessage(player, "Set walk speed to " + speed);
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -675,7 +701,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.get("player");
 				if (!player.getWorld().getUID().equals(target.getWorld().getUID())) {
 					sendMessage(player, "Target is in a different world");
-					return;
+					return true;
 				}
 				Location l1 = player.getLocation();
 				Location l2 = target.getLocation();
@@ -685,6 +711,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(player, String.format("Measuring Distance to Player %s", target.getName()));
 				sendMessage(player, String.format("Distance: %3.02f", d.length()));
 				sendMessage(player, String.format("Difference: %3.02f %3.02f %3.02f", d.getX(), d.getY(), d.getZ()));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -701,14 +728,14 @@ public class RedfixPlugin extends JavaPlugin {
 						try {
 							if (level < 0) {
 								sendMessage(player, "Please use as level at least 0");
-								return;
+								return false;
 							}
 							ItemStack item = player.getInventory().getItemInMainHand();
 							if (item.getType() == Material.AIR)
 								item = player.getInventory().getItemInOffHand();
 							if (item.getType() == Material.AIR) {
 								sendMessage(player, "You are not holding any item");
-								return;
+								return false;
 							}
 							item.removeEnchantment(enchantment);
 							if (level != 0)
@@ -726,6 +753,7 @@ public class RedfixPlugin extends JavaPlugin {
 								sendMessage(player, "Removed " + enchantment + " from " + item.getType());
 						} catch (Exception ignored) {
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -747,6 +775,7 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -762,7 +791,7 @@ public class RedfixPlugin extends JavaPlugin {
 					target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
 				} catch (ClassCastException e) {
 					sendMessage(sender, "You are not a player");
-					return;
+					return false;
 				}
 				int playedTicks = target.getStatistic(Statistic.PLAY_ONE_MINUTE);
 				int seconds = playedTicks / 20;
@@ -772,6 +801,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(sender,
 						String.format("Play Time: %02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60,
 								seconds % 60));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -793,6 +823,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sender.sendMessage("§6" + (i + 1) + ": §3" + players.get(i).getName() + " §a- §6" + String.format(
 							"%02d days %02d h %02d m %02d s", days, hours % 24, minutes % 60, seconds % 60));
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -828,11 +859,11 @@ public class RedfixPlugin extends JavaPlugin {
 							item = player.getInventory().getItemInOffHand();
 							if (item.getType() == Material.AIR) {
 								sendMessage(player, "You are not holding any item");
-								return;
+								return false;
 							}
 							if (!(item.getItemMeta() instanceof Damageable)) {
 								sendMessage(player, "You are not holding any damageable item");
-								return;
+								return false;
 							}
 							Damageable meta = (Damageable) item.getItemMeta();
 							meta.setDamage(0);
@@ -844,11 +875,11 @@ public class RedfixPlugin extends JavaPlugin {
 								item = player.getInventory().getItemInOffHand();
 								if (item.getType() == Material.AIR) {
 									sendMessage(player, "You are not holding any damageable item");
-									return;
+									return false;
 								}
 								if (!(item.getItemMeta() instanceof Damageable)) {
 									sendMessage(player, "You are not holding any damageable item");
-									return;
+									return false;
 								}
 								Damageable meta = (Damageable) item.getItemMeta();
 								meta.setDamage(0);
@@ -866,6 +897,7 @@ public class RedfixPlugin extends JavaPlugin {
 					} catch (Exception ignored) {
 					}
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -881,7 +913,7 @@ public class RedfixPlugin extends JavaPlugin {
 						item = player.getInventory().getItemInOffHand();
 					if (item.getType() == Material.AIR) {
 						sendMessage(player, "You are not holding any item");
-						return;
+						return false;
 					}
 					ItemMeta meta = item.getItemMeta();
 					meta.setUnbreakable(true);
@@ -895,6 +927,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Made " + item.getType() + " unbreakable");
 				} catch (Exception ignored) {
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -911,7 +944,7 @@ public class RedfixPlugin extends JavaPlugin {
 								item = player.getInventory().getItemInOffHand();
 							if (item.getType() == Material.AIR) {
 								sendMessage(player, "You are not holding any item");
-								return;
+								return false;
 							}
 							ItemMeta meta = item.getItemMeta();
 							List<String> lore = new ArrayList<>();
@@ -934,6 +967,7 @@ public class RedfixPlugin extends JavaPlugin {
 							sendMessage(player, "Added lore to " + item.getType());
 						} catch (Exception ignored) {
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -950,7 +984,7 @@ public class RedfixPlugin extends JavaPlugin {
 						item = player.getInventory().getItemInOffHand();
 					if (item.getType() == Material.AIR) {
 						sendMessage(player, "You are not holding any item");
-						return;
+						return false;
 					}
 					ItemMeta meta = item.getItemMeta();
 					List<String> lore = new ArrayList<>();
@@ -971,6 +1005,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Added lore to " + item.getType());
 				} catch (Exception ignored) {
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -983,6 +1018,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openWorkbench(null, true);
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -995,6 +1031,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.ANVIL));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1007,6 +1044,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.GRINDSTONE));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1019,6 +1057,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.STONECUTTER));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1031,6 +1070,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.LOOM));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1043,6 +1083,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.CARTOGRAPHY));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1055,6 +1096,7 @@ public class RedfixPlugin extends JavaPlugin {
 					Player player = (Player) commandContext.getSender();
 					player.openInventory(Bukkit.createInventory(player, InventoryType.SMITHING));
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1064,16 +1106,17 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("ec");
 			builder = builder.permission("redfix.command.ec").argument(PlayerArgument.of("target").optional()).handler(
 					commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						Player target = commandContext.getOrDefault("target", player);
+						if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
+								"redfix.command.ec.others")) {
+							CommandUtils.printMissingPermission(player, "redfix.command.ec.others");
+							return false;
+						}
 						Bukkit.getScheduler().runTask(this, () -> {
-							Player player = (Player) commandContext.getSender();
-							Player target = commandContext.getOrDefault("target", player);
-							if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
-									"redfix.command.ec.others")) {
-								CommandUtils.printMissingPermission(player, "redfix.command.ec.others");
-								return;
-							}
 							player.openInventory(target.getEnderChest());
 						});
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1088,6 +1131,7 @@ public class RedfixPlugin extends JavaPlugin {
 							Player target = commandContext.get("target");
 							player.openInventory(target.getInventory());
 						});
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1103,6 +1147,7 @@ public class RedfixPlugin extends JavaPlugin {
 							//new InvSee(player, target);
 							getRegChestManager().openInventory(player, target);
 						});
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1117,7 +1162,7 @@ public class RedfixPlugin extends JavaPlugin {
 						if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
 								"redfix.command.afk.others")) {
 							CommandUtils.printMissingPermission(player, "redfix.command.afk.others");
-							return;
+							return false;
 						}
 						if (Afk.isAfk(target.getUniqueId())) {
 							Afk.afkTimes.put(target.getUniqueId(), System.currentTimeMillis());
@@ -1125,6 +1170,7 @@ public class RedfixPlugin extends JavaPlugin {
 						else {
 							Afk.afkTimes.put(target.getUniqueId(), System.currentTimeMillis() - 1000 * 60 * 5);
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1147,9 +1193,10 @@ public class RedfixPlugin extends JavaPlugin {
 							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
 									"&")).toList();
 					if (pl.size() > 0) {
-						sender.sendMessage("§6" + groupName+" §f("+pl.size()+")§6: " + String.join(", ", pl));
+						sender.sendMessage("§6" + groupName + " §f(" + pl.size() + ")§6: " + String.join(", ", pl));
 					}
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1206,8 +1253,26 @@ public class RedfixPlugin extends JavaPlugin {
 							});
 						} catch (Exception ignored) {
 						}
+						return true;
 					});
 			commandManager.register(builder);
+		}
+		
+		//Chunkinfo
+		{
+			FrameworkCommand.Builder<Player> topBuilder = FrameworkCommand.playerCommandBuilder("chunkinfo",
+					"ci").permission("redfix.command.chunkinfo");
+			commandManager.register(
+					topBuilder.subCommand("slimechunk").permission("redfix.command.chunkinfo.slimechunk").handler(c -> {
+						Player player = (Player) c.getSender();
+						if (player.getLocation().getChunk().isSlimeChunk()) {
+							sendMessage(player, "You are in a slimechunk");
+						}
+						else {
+							sendMessage(player, "You are not in a slimechunk");
+						}
+						return true;
+					}));
 		}
 		
 		//Smite
@@ -1232,6 +1297,7 @@ public class RedfixPlugin extends JavaPlugin {
 							}
 						} catch (Exception ignored) {
 						}
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1264,6 +1330,7 @@ public class RedfixPlugin extends JavaPlugin {
 						sendMessage(player, "You are not looking at any block");
 				} catch (Exception ignored) {
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1290,6 +1357,20 @@ public class RedfixPlugin extends JavaPlugin {
 						sendMessage(player, "You are not looking at any block");
 				} catch (Exception ignored) {
 				}
+				return true;
+			});
+			commandManager.register(builder);
+		}
+		
+		//ClearChat
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("clearchat");
+			builder = builder.permission("redfix.command.clearchat").handler(commandContext -> {
+				Component c = Component.text("\n".repeat(100)).append(
+						Component.text("-".repeat(10) + "Chat Cleared by Admin" + "-".repeat(10)));
+				Bukkit.getOnlinePlayers().stream().filter(
+						p -> !p.hasPermission("redfix.command.clearchat.exempt")).forEach(p -> p.sendMessage(c));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1309,7 +1390,7 @@ public class RedfixPlugin extends JavaPlugin {
 					if (!player.hasPermission("redfix.command.commandspy")) {
 						player.sendMessage(getConfig().getString("commandspy.prefix",
 								"§cCommandSpy » ") + "I'm sorry, but you don't have the permission");
-						return;
+						return false;
 					}
 					commandSpy.players.add(player.getUniqueId());
 					player.sendMessage(
@@ -1317,6 +1398,7 @@ public class RedfixPlugin extends JavaPlugin {
 									"commandspy.enable", "§7CommandSpy wurde §eaktiviert"));
 				}
 				commandSpy.save();
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1337,6 +1419,7 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1414,7 +1497,7 @@ public class RedfixPlugin extends JavaPlugin {
 						item = player.getInventory().getItemInOffHand();
 						if (item.getType() == Material.AIR) {
 							sendMessage(player, "You are not holding any item");
-							return;
+							return false;
 						}
 						ItemMeta meta = item.getItemMeta();
 						meta.addAttributeModifier(attribute, modifier);
@@ -1430,6 +1513,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(player, "Added attribute modifier " + modifier + " to " + item.getType());
 				} catch (Exception ignore) {
 				}
+				return true;
 			});
 			FrameworkCommand.Builder<Player> removeBuilder = topBuilder.subPlayerCommand("remove").argument(
 					uuidArgument).handler(commandContext -> {
@@ -1444,7 +1528,7 @@ public class RedfixPlugin extends JavaPlugin {
 						item = player.getInventory().getItemInOffHand();
 						if (item.getType() == Material.AIR) {
 							sendMessage(player, "You are not holding any item");
-							return;
+							return false;
 						}
 						ItemMeta meta = item.getItemMeta();
 						entry = meta.getAttributeModifiers().entries().stream().filter(
@@ -1465,6 +1549,7 @@ public class RedfixPlugin extends JavaPlugin {
 							"Removed attribute modifier " + entry.getValue() + " (" + entry.getKey() + ") from " + item.getType());
 				} catch (Exception ignore) {
 				}
+				return true;
 			});
 			
 			commandManager.register(addBuilder);
@@ -1481,10 +1566,11 @@ public class RedfixPlugin extends JavaPlugin {
 				if (!player.getUniqueId().equals(target.getUniqueId()) && !player.hasPermission(
 						"redfix.command.bal.others")) {
 					CommandUtils.printMissingPermission(player, "redfix.command.bal.others");
-					return;
+					return false;
 				}
 				sendMessage(player, "§aBalance of " + target.getName() + ": " + EconomyManager.getMoney(
 						target.getUniqueId()) + getConfig().getString("economy.symbol", "$"));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1503,6 +1589,7 @@ public class RedfixPlugin extends JavaPlugin {
 							players.get(i)).getName() + " §a- §6" + vaultEconomy.format(
 							EconomyManager.getMoney(players.get(i))));
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1521,6 +1608,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(sender, "Set money of player " + player.getName() + " to " + amount + getConfig().getString(
 						"economy.symbol", "$"));
 				saveEco();
+				return true;
 			});
 			FrameworkCommand.Builder<CommandSender> giveBuilder = topBuilder.subCommand("give").permission(
 					"redfix.command.economy.give").argument(OfflinePlayerArgument.of("player")).argument(
@@ -1533,6 +1621,7 @@ public class RedfixPlugin extends JavaPlugin {
 						"Gave player " + player.getName() + " " + amount + getConfig().getString("economy.symbol",
 								"$"));
 				saveEco();
+				return true;
 			});
 			FrameworkCommand.Builder<CommandSender> takeBuilder = topBuilder.subCommand("take").permission(
 					"redfix.command.economy.take").argument(OfflinePlayerArgument.of("player")).argument(
@@ -1544,6 +1633,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sendMessage(sender, "Took " + +amount + getConfig().getString("economy.symbol",
 						"$") + " from player " + player.getName());
 				saveEco();
+				return true;
 			});
 			FrameworkCommand.Builder<CommandSender> resetBuilder = topBuilder.subCommand("reset").permission(
 					"redfix.command.economy.reset").argument(OfflinePlayerArgument.of("player")).handler(
@@ -1553,6 +1643,7 @@ public class RedfixPlugin extends JavaPlugin {
 						EconomyManager.setMoney(player.getUniqueId(), getConfig().getDouble("economy.startMoney", 100));
 						sendMessage(sender, "Reset player's " + player.getName() + " money");
 						saveEco();
+						return true;
 					});
 			
 			commandManager.register(setBuilder);
@@ -1589,6 +1680,7 @@ public class RedfixPlugin extends JavaPlugin {
 						sendMessage(sender, "§bYou got §a" + amount + getConfig().getString("economy.symbol",
 								"$") + "§b from §6" + sender.getDisplayName());
 						saveEco();
+						return true;
 					});
 			
 			commandManager.register(builder);
@@ -1606,6 +1698,7 @@ public class RedfixPlugin extends JavaPlugin {
 						}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
 								"§$1").replaceAll("&§§", "&");
 						Bukkit.broadcastMessage("§6[§4Broadcast§6] §a" + message);
+						return true;
 					});
 			
 			commandManager.register(builder);
@@ -1621,6 +1714,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.getOrDefault("target", sender);
 				addToHistory(target);
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(player));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1633,6 +1727,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player target = commandContext.get("target");
 				addToHistory(target);
 				Bukkit.getScheduler().runTask(this, () -> target.teleport(sender));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1648,6 +1743,7 @@ public class RedfixPlugin extends JavaPlugin {
 							p.teleport(player);
 							addToHistory(p);
 						}));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1671,6 +1767,7 @@ public class RedfixPlugin extends JavaPlugin {
 						double y = commandContext.get("y");
 						double z = commandContext.get("z");
 						Bukkit.getScheduler().runTask(this, () -> target.teleport(new Location(world, x, y, z)));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1685,9 +1782,10 @@ public class RedfixPlugin extends JavaPlugin {
 						if (!sender.getUniqueId().equals(target.getUniqueId()) && !sender.hasPermission(
 								"redfix.command.tp.back.others")) {
 							CommandUtils.printMissingPermission(sender, "redfix.command.tp.back.others");
-							return;
+							return false;
 						}
 						Bukkit.getScheduler().runTask(this, () -> pollHistory(target, sender));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1702,9 +1800,10 @@ public class RedfixPlugin extends JavaPlugin {
 						if (!sender.getUniqueId().equals(target.getUniqueId()) && !sender.hasPermission(
 								"redfix.command.tp.dback.others")) {
 							CommandUtils.printMissingPermission(sender, "redfix.command.tp.dback.others");
-							return;
+							return false;
 						}
 						Bukkit.getScheduler().runTask(this, () -> pollDeath(target, sender));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1719,6 +1818,7 @@ public class RedfixPlugin extends JavaPlugin {
 				String message0 = String.join(" ", smsg);
 				String message = message0.replaceAll("&", "§");
 				Bukkit.getScheduler().runTask(this, () -> player.kickPlayer(message));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1735,6 +1835,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message, null, null).save();
 				if (player.isOnline())
 					Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1754,6 +1855,7 @@ public class RedfixPlugin extends JavaPlugin {
 								Date.from(Instant.now().plus(minutes, ChronoUnit.MINUTES)), null).save();
 						if (player.isOnline())
 							Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1764,6 +1866,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.mute").argument(PlayerArgument.of("player")).handler(commandContext -> {
 				Player player = commandContext.get("player");
 				muted.put(player.getUniqueId(), Long.MAX_VALUE);
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1776,6 +1879,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = commandContext.get("player");
 				int minutes = commandContext.get("duration");
 				muted.put(player.getUniqueId(), System.currentTimeMillis() + minutes * 60 * 1000);
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1786,6 +1890,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.unmute").argument(PlayerArgument.of("player")).handler(commandContext -> {
 				Player player = commandContext.get("player");
 				muted.remove(player.getUniqueId());
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1797,6 +1902,7 @@ public class RedfixPlugin extends JavaPlugin {
 					commandContext -> {
 						int maxValue = commandContext.get("maxValue");
 						sendMessage(commandContext.getSender(), "Roll: " + (new Random().nextInt(maxValue) + 1));
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -1836,6 +1942,7 @@ public class RedfixPlugin extends JavaPlugin {
 								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -1848,7 +1955,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player sender = (Player) commandContext.getSender();
 				if (!lastMessaged.containsKey(sender.getUniqueId())) {
 					sendMessage(sender, "Du hast keinen Dialog mit einem Spieler.");
-					return;
+					return false;
 				}
 				UUID target = lastMessaged.get(sender.getUniqueId());
 				Player player = Bukkit.getPlayer(target);
@@ -1886,11 +1993,10 @@ public class RedfixPlugin extends JavaPlugin {
 								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
 								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
 				}
+				return true;
 			});
 			commandManager.register(builder);
 		}
-		
-		//Experience
 		
 		//Me
 		{
@@ -1914,6 +2020,7 @@ public class RedfixPlugin extends JavaPlugin {
 							("§7" + name + "§7 " + message).replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
 									"§$1").replaceAll("&§§", "&"));
 				}
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1931,6 +2038,7 @@ public class RedfixPlugin extends JavaPlugin {
 					sendMessage(commandContext.getSender(), "Worth of " + material + " is §6" + vaultEconomy.format(
 							value) + "§f,\nbut you will only receive §6" + vaultEconomy.format(
 							value * (1 - getConfig().getDouble("economy.sellFee", 0.2))) + "§f for selling");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1942,6 +2050,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"defaultworth").permission("redfix.command.worth.default").handler(commandContext -> {
 				WorthCalculator.setToDefault();
 				sendMessage(commandContext.getSender(), "Reset worth");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1953,6 +2062,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.worth.clear").handler(commandContext -> {
 				WorthCalculator.clear();
 				sendMessage(commandContext.getSender(), "Cleared worth");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1968,6 +2078,7 @@ public class RedfixPlugin extends JavaPlugin {
 				if (value < 0)
 					value = Double.NaN;
 				WorthCalculator.worthMap.put(material, value);
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1979,6 +2090,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.worth.load").handler(commandContext -> {
 				WorthCalculator.load(new File(pluginPath, "worth.yml"));
 				sendMessage(commandContext.getSender(), "Loaded Worth");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -1990,6 +2102,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.worth.save").handler(commandContext -> {
 				WorthCalculator.save(new File(pluginPath, "worth.yml"));
 				sendMessage(commandContext.getSender(), "Saved Worth");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2015,6 +2128,7 @@ public class RedfixPlugin extends JavaPlugin {
 						}
 						sendMessage(commandContext.getSender(), "Caluclated Worth");
 					});
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2030,13 +2144,13 @@ public class RedfixPlugin extends JavaPlugin {
 					if (item.getItemMeta() instanceof Damageable damageable) {
 						if (damageable.hasDamage()) {
 							sendMessage(sender, "Cannot sell damaged items");
-							return;
+							return false;
 						}
 					}
 					double val = WorthCalculator.getWorth(item.getType(), new HashSet<>());
 					if (Double.isNaN(val)) {
 						sendMessage(sender, "Item has no Worth");
-						return;
+						return false;
 					}
 					double cnt = sender.getInventory().getItemInMainHand().getAmount();
 					sender.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
@@ -2044,7 +2158,9 @@ public class RedfixPlugin extends JavaPlugin {
 					//EconomyManager.addMoney(sender.getUniqueId(), pay);
 					mainEconomy.depositPlayer(sender, pay);
 					sendMessage(sender, "You received for selling " + vaultEconomy.format(pay));
+					return true;
 				}
+				return false;
 			});
 			
 			commandManager.register(builder);
@@ -2077,6 +2193,7 @@ public class RedfixPlugin extends JavaPlugin {
 				sender.sendMessage("§rm - §mStrikethrough");
 				sender.sendMessage("§rk - §kMagic");
 				sender.sendMessage("§rr - §rReset");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2105,6 +2222,7 @@ public class RedfixPlugin extends JavaPlugin {
 								sendMessage(sender, "Removed " + entities.size() + " Entities");
 							}
 						});
+						return true;
 					});
 			commandManager.register(builder);
 		}
@@ -2131,6 +2249,7 @@ public class RedfixPlugin extends JavaPlugin {
 						sendMessage(sender, "Du schaust nicht auf einen Itemframe");
 					}
 				});
+				return true;
 			});
 			commandManager.register(builder);
 		}
@@ -2144,6 +2263,7 @@ public class RedfixPlugin extends JavaPlugin {
 				String cmd = String.join(" ", scmd);
 				Player player = commandContext.get("player");
 				Bukkit.dispatchCommand(player, cmd);
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2169,6 +2289,7 @@ public class RedfixPlugin extends JavaPlugin {
 							CommandContext c = new CommandContext(player, cmd + " " + String.join(" ", args));
 							node.executeIgnorePerms(c, args);
 						}
+						return true;
 					});
 			
 			commandManager.register(builder);
@@ -2185,6 +2306,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Command command = Bukkit.getCommandMap().getCommand(scmd[0]);
 				if (command != null)
 					command.execute(player, scmd[0], Arrays.copyOfRange(scmd, 1, scmd.length));
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2200,6 +2322,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Bukkit.getScheduler().runTaskAsynchronously(this, () -> Bukkit.getPluginManager().callEvent(
 						new AsyncPlayerChatEvent(true, player, String.join(" ", msg),
 								new HashSet<>(Bukkit.getOnlinePlayers()))));
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2211,6 +2334,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"redfix.command.ip").argument(PlayerArgument.of("player")).handler(commandContext -> {
 				Player player = commandContext.get("player");
 				sendMessage(commandContext.getSender(), "Ip of " + player.getName() + ": " + player.getAddress());
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2224,10 +2348,11 @@ public class RedfixPlugin extends JavaPlugin {
 				if (!commandContext.getSender().equals(player) && !commandContext.getSender().hasPermission(
 						"redfix.command.ping.others")) {
 					CommandUtils.printMissingPermission(commandContext.getSender(), "redfix.command.ping.others");
-					return;
+					return false;
 				}
 				sendMessage(commandContext.getSender(),
 						"Ping of " + player.getName() + ": " + player.getPing() + " ms");
+				return true;
 			});
 			
 			commandManager.register(builder);
@@ -2651,10 +2776,9 @@ public class RedfixPlugin extends JavaPlugin {
 	public static boolean isVanished(Player player) {
 		if (Bukkit.getPluginManager().isPluginEnabled("SuperVanish") || Bukkit.getPluginManager().isPluginEnabled(
 				"PremiumVanish")) {
-			if (VanishAPI.isInvisible(player))
-				return true;
+			return VanishAPI.isInvisible(player);
 		}
-		return player.isInvisible();
+		return false;
 	}
 	
 	public static boolean isVanished(Player viewer, Player player) {
@@ -2663,7 +2787,7 @@ public class RedfixPlugin extends JavaPlugin {
 			if (VanishAPI.isInvisible(player))
 				return !VanishAPI.canSee(viewer, player);
 		}
-		return player.isInvisible();
+		return !viewer.canSee(player);
 	}
 	
 	public static boolean canSee(Player viewer, Player player) {
@@ -2672,7 +2796,7 @@ public class RedfixPlugin extends JavaPlugin {
 			if (VanishAPI.isInvisible(player))
 				return VanishAPI.canSee(viewer, player);
 		}
-		return !player.isInvisible();
+		return viewer.canSee(player);
 	}
 	
 }
