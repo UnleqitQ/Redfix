@@ -1671,7 +1671,7 @@ public class RedfixPlugin extends JavaPlugin {
 							}
 						if (EconomyManager.getMoney(sender.getUniqueId()) < amount) {
 							sendMessage(sender, "§4You have not enough money");
-							return;
+							return false;
 						}
 						EconomyManager.addMoney(player.getUniqueId(), amount);
 						EconomyManager.addMoney(sender.getUniqueId(), -amount);
@@ -1961,7 +1961,7 @@ public class RedfixPlugin extends JavaPlugin {
 				Player player = Bukkit.getPlayer(target);
 				if (player == null) {
 					sendMessage(sender, "Der Spieler ist nicht online.");
-					return;
+					return false;
 				}
 				if (!canSee(sender, player))
 					sendMessage(sender, "Der Spieler ist nicht online.");
