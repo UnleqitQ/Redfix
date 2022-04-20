@@ -52,6 +52,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -1484,9 +1485,38 @@ public class RedfixPlugin extends JavaPlugin {
 					int duration = commandContext.get("duration");
 					int level = commandContext.get("level");
 					boolean particles = commandContext.get("showParticles");
-					Bukkit.getScheduler().runTask(this, () ->
-							CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level, particles,
+					Bukkit.getScheduler().runTask(this,
+							() -> CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level, particles,
 									false));
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				return true;
+			});
+			commandManager.register(builder);
+		}
+		
+		//ModPotion
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("modifypotion");
+			builder = builder.permission("redfix.command.modifypotion").argument(EffectArgument.of("effect")).argument(
+					IntegerArgument.optional("duration", 30)).argument(IntegerArgument.optional("level", 0)).argument(
+					BooleanArgument.optional("showParticles", true)).handler(commandContext -> {
+				try {
+					Player player = (Player) commandContext.getSender();
+					PotionEffectType effectType = commandContext.get("effect");
+					int duration = commandContext.get("duration");
+					int level = commandContext.get("level");
+					boolean particles = commandContext.get("showParticles");
+					ItemStack item = player.getInventory().getItemInMainHand();
+					if (item.getItemMeta() instanceof PotionMeta meta) {
+						meta.addCustomEffect(effectType.createEffect(duration, level), true);
+						item.setItemMeta(meta);
+						sendMessage(player, "Successfully modified potion");
+					}
+					else {
+						sendMessage(player, "§4You are not holding a potion-bottle");
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
