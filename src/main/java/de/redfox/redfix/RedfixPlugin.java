@@ -123,6 +123,7 @@ public class RedfixPlugin extends JavaPlugin {
 		afk = new Afk();
 		Bukkit.getPluginManager().registerEvents(afk, this);
 		Bukkit.getPluginManager().registerEvents(new JoinQuitListener(), this);
+		Bukkit.getPluginManager().registerEvents(new Freeze(), this);
 		Bukkit.getPluginManager().registerEvents(new ColorListener(), this);
 		Bukkit.getPluginManager().registerEvents(new InstaBreak(), this);
 		new God();
@@ -336,6 +337,27 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//God
+		{
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("freeze");
+			builder = builder.permission("redfix.command.freeze").argument(PlayerArgument.of("player"), "player")
+					//.argument(PlayerArgument.of("player"))
+					.handler(commandContext -> {
+						CommandSender sender = commandContext.getSender();
+						Player target = commandContext.get("player");
+						if (Freeze.players.contains(target.getUniqueId())) {
+							Freeze.players.remove(target.getUniqueId());
+							sendMessage(sender, "Unfreezed Player");
+						}
+						else {
+							Freeze.players.add(target.getUniqueId());
+							sendMessage(sender, "Freezed Player");
+						}
+						return true;
+					});
+			commandManager.register(builder);
+		}
+		
 		//InstaBreak
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("instabreak");
@@ -370,8 +392,7 @@ public class RedfixPlugin extends JavaPlugin {
 					PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
 				Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
-				target.setHealth(
-						target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue() + target.getAbsorptionAmount());
+				target.setHealth(target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue());
 				target.setExhaustion(0);
 				target.setSaturation(20);
 				target.setFoodLevel(20);
@@ -1463,7 +1484,9 @@ public class RedfixPlugin extends JavaPlugin {
 					int duration = commandContext.get("duration");
 					int level = commandContext.get("level");
 					boolean particles = commandContext.get("showParticles");
-					CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level, particles, false);
+					Bukkit.getScheduler().runTask(this, () ->
+							CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level, particles,
+									false));
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
