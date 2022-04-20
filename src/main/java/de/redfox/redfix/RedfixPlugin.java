@@ -1510,7 +1510,8 @@ public class RedfixPlugin extends JavaPlugin {
 					boolean particles = commandContext.get("showParticles");
 					ItemStack item = player.getInventory().getItemInMainHand();
 					if (item.getItemMeta() instanceof PotionMeta meta) {
-						meta.addCustomEffect(effectType.createEffect(duration, level), true);
+						meta.addCustomEffect(effectType.createEffect(duration * 20, level).withParticles(particles),
+								true);
 						item.setItemMeta(meta);
 						sendMessage(player, "Successfully modified potion");
 					}
