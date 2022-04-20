@@ -10,6 +10,7 @@ softdepend:
   - Vault
   - SuperVanish
   - PremiumVanish
+  - CustomPotionEffectAPI
 
 permissions:
   redfix.command.commandspy:

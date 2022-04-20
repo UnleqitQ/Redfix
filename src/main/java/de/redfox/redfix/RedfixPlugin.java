@@ -5,6 +5,7 @@ import com.google.common.base.Predicates;
 import com.google.gson.*;
 import de.myzelyam.api.vanish.VanishAPI;
 import de.redfox.redfix.chat.ChatListener;
+import de.redfox.redfix.commandframework.CEffectArgument;
 import de.redfox.redfix.commands.CommandSpy;
 import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.economy.EconomyManager;
@@ -23,6 +24,8 @@ import me.unleqitq.commandframework.CommandUtils;
 import me.unleqitq.commandframework.building.argument.*;
 import me.unleqitq.commandframework.building.command.FrameworkCommand;
 import me.unleqitq.commandframework.building.flag.FrameworkFlag;
+import me.unleqitq.custompotioneffectapi.CPotionEffectType;
+import me.unleqitq.custompotioneffectapi.CustomPotionEffectAPI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.JoinConfiguration;
@@ -81,6 +84,7 @@ public class RedfixPlugin extends JavaPlugin {
 	public VaultEconomy vaultEconomy;
 	public Economy mainEconomy;
 	public Afk afk;
+	Nick nick;
 	public static Map<UUID, Long> muted = new HashMap<>();
 	public static CommandManager commandManager;
 	
@@ -115,7 +119,7 @@ public class RedfixPlugin extends JavaPlugin {
 		commandManager = new CommandManager(this);
 		
 		loadAll();
-		
+		nick = new Nick();
 		afk = new Afk();
 		Bukkit.getPluginManager().registerEvents(afk, this);
 		Bukkit.getPluginManager().registerEvents(new JoinQuitListener(), this);
@@ -123,7 +127,9 @@ public class RedfixPlugin extends JavaPlugin {
 		Bukkit.getPluginManager().registerEvents(new InstaBreak(), this);
 		new God();
 		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
+		Bukkit.getPluginManager().registerEvents(nick, this);
 		ProtocolLibrary.getProtocolManager().addPacketListener(afk);
+		ProtocolLibrary.getProtocolManager().addPacketListener(nick);
 		new JailHandler();
 		Afk.init();
 		Bukkit.getScheduler().runTaskTimer(this, Afk::check, 20, 20);
@@ -190,6 +196,26 @@ public class RedfixPlugin extends JavaPlugin {
 	}
 	
 	private void registerCommands() {
+		
+		//RedFix command
+		{
+			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder("redfix").permission(
+					"redfix.command.admin");
+			
+			//Config
+			{
+				FrameworkCommand.Builder<CommandSender> configBuilder = topBuilder.subCommand("config").permission(
+						"redfix.command.admin.config");
+				
+				commandManager.register(
+						configBuilder.subCommand("reload").permission("redfix.command.admin.config.reload").handler(
+								c -> {
+									saveDefaultConfig();
+									reloadConfig();
+									return true;
+								}));
+			}
+		}
 		
 		//Jail
 		{
@@ -1424,6 +1450,28 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
+		//CEffect
+		if (Bukkit.getPluginManager().isPluginEnabled("CustomPotionEffectAPI")) {
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ceffect");
+			builder = builder.permission("redfix.command.ceffect").argument(PlayerArgument.of("player")).argument(
+					CEffectArgument.of("effect")).argument(IntegerArgument.optional("duration", 30)).argument(
+					IntegerArgument.optional("level", 0)).argument(
+					BooleanArgument.optional("showParticles", true)).handler(commandContext -> {
+				try {
+					Player player = commandContext.get("player");
+					CPotionEffectType effectType = commandContext.get("effect");
+					int duration = commandContext.get("duration");
+					int level = commandContext.get("level");
+					boolean particles = commandContext.get("showParticles");
+					CustomPotionEffectAPI.addEffect(player, effectType, duration, level, particles, false);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				return true;
+			});
+			commandManager.register(builder);
+		}
+		
 		//Item Attribute
 		{
 			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder(
@@ -1905,6 +1953,22 @@ public class RedfixPlugin extends JavaPlugin {
 						return true;
 					});
 			commandManager.register(builder);
+		}
+		
+		//Nick
+		{
+			FrameworkCommand.Builder<Player> topBuilder = FrameworkCommand.playerCommandBuilder("nick").permission(
+					"redfix.command.nick");
+			commandManager.register(topBuilder.subCommand("set").argument(StringArgument.of("value")).handler(c -> {
+				Nick.nicks.put(((Player) c.getSender()).getUniqueId(), c.get("value"));
+				Nick.update((Player) c.getSender());
+				return true;
+			}));
+			commandManager.register(topBuilder.subCommand("reset").handler(c -> {
+				Nick.nicks.remove(((Player) c.getSender()).getUniqueId());
+				Nick.update((Player) c.getSender());
+				return true;
+			}));
 		}
 		
 		//Msg

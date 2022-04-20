@@ -31,3 +31,5 @@ commands:
     cooldown: 10
   warp:
     cooldown: 10
+
+auto-unlock-recipes: false
