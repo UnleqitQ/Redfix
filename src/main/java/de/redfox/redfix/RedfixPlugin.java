@@ -1463,7 +1463,7 @@ public class RedfixPlugin extends JavaPlugin {
 					int duration = commandContext.get("duration");
 					int level = commandContext.get("level");
 					boolean particles = commandContext.get("showParticles");
-					CustomPotionEffectAPI.addEffect(player, effectType, duration, level, particles, false);
+					CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level, particles, false);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
