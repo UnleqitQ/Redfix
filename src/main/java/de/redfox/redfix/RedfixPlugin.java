@@ -1,7 +1,6 @@
 package de.redfox.redfix;
 
 import com.comphenix.protocol.ProtocolLibrary;
-import com.google.common.base.Predicates;
 import com.google.gson.*;
 import de.myzelyam.api.vanish.VanishAPI;
 import de.redfox.redfix.chat.ChatListener;
@@ -16,6 +15,7 @@ import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
 import de.redfox.redfix.utils.PlayerWeatherType;
+import de.redfox.redfix.utils.RfSql;
 import de.redfox.redfix.utils.WeatherType;
 import me.unleqitq.commandframework.CommandContext;
 import me.unleqitq.commandframework.CommandManager;
@@ -65,6 +65,7 @@ import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -93,6 +94,8 @@ public class RedfixPlugin extends JavaPlugin {
 	public static Map<UUID, Deque<Location>> playerLocationHistory = new HashMap<>();
 	public static Map<UUID, Map<String, Home>> homes = new HashMap<>();
 	public static Map<String, Warp> warps = new HashMap<>();
+	
+	public static RfSql sql = null;
 	
 	private static ChestManager chestManager;
 	
@@ -142,7 +145,7 @@ public class RedfixPlugin extends JavaPlugin {
 		commandSpy.load();
 		if (isEconomyEnabled()) {
 			vaultEconomy = new VaultEconomy();
-			getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Normal);
+			getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Highest);
 			mainEconomy = vaultEconomy;
 		}
 		else {
@@ -160,6 +163,24 @@ public class RedfixPlugin extends JavaPlugin {
 		new ChatListener();
 		
 		chestManager = new ChestManager();
+		if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+			new RedfixPlaceholder().register();
+		}
+		
+		if (getConfig().getBoolean("mysql.enabled", false)) {
+			sql = new RfSql(getConfig().getString("mysql.host", "localhost"), getConfig().getInt("mysql.port", 3306),
+					getConfig().getString("mysql.username", "root"), getConfig().getString("mysql.password", ""),
+					getConfig().getString("mysql.database", "minecraft"), getConfig().getString("mysql.prefix", "rf_"));
+			if (getConfig().getBoolean("mysql.modules.economy", false)) {
+				try {
+					sql.createTable("economy",
+							List.of(new RfSql.ColumnData("UUID", "VARCHAR(36)").setNotNull().setUnique(),
+									new RfSql.ColumnData("money", "DOUBLE").setNotNull()), "UUID");
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 	
 	@Override
@@ -338,7 +359,7 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
-		//God
+		//Freeze
 		{
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("freeze");
 			builder = builder.permission("redfix.command.freeze").argument(PlayerArgument.of("player"), "player")
@@ -1238,10 +1259,10 @@ public class RedfixPlugin extends JavaPlugin {
 							p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") + (isVanished(
 									p) ? "§7§o[Vanished] §f" : "§f") + vaultChat.getPlayerPrefix(
 									p) + p.getDisplayName() + vaultChat.getPlayerSuffix(p) + "§f").map(
-							s -> s.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§",
-									"&")).toList();
+							RedfixPlugin::applyColor).toList();
 					if (pl.size() > 0) {
-						sender.sendMessage("§6" + groupName + " §f(" + pl.size() + ")§6: " + String.join(", ", pl));
+						sender.sendMessage(
+								"§6" + applyColor(groupName) + " §f(" + pl.size() + ")§6: " + String.join(", ", pl));
 					}
 				}
 				return true;
@@ -1350,11 +1371,12 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		
-		//EditSign
+		//Sign
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("editsign");
-			builder = builder.permission("redfix.command.editsign").argument(IntegerArgument.of("line")).argument(
-					StringArrayArgument.of("content").optional(new String[0])).handler(commandContext -> {
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("sign").permission(
+					"redfix.command.sign");
+			commandManager.register(builder.subCommand("edit").argument(IntegerArgument.of("line")).argument(
+					StringArrayArgument.of("content")).handler(commandContext -> {
 				try {
 					Player player = (Player) commandContext.getSender();
 					int line = commandContext.get("line");
@@ -1364,39 +1386,12 @@ public class RedfixPlugin extends JavaPlugin {
 						sb.append(" ");
 					}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
 							"§$1").replaceAll("&§§", "&");
-					RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
-							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, false, 0,
-							Predicates.alwaysFalse());
+					RayTraceResult result = player.rayTraceBlocks(10, FluidCollisionMode.NEVER);
 					if (result != null && result.getHitBlock() != null) {
 						Block block = result.getHitBlock();
-						if (block instanceof Sign sign)
+						if (block.getState(false) instanceof Sign sign) {
 							sign.setLine(line - 1, v);
-						else
-							sendMessage(player, "You are not looking at a sign");
-					}
-					else
-						sendMessage(player, "You are not looking at any block");
-				} catch (Exception ignored) {
-				}
-				return true;
-			});
-			commandManager.register(builder);
-		}
-		
-		//ToggleSignGlowing
-		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("togglesignglowing");
-			builder = builder.permission("redfix.command.editsign").handler(commandContext -> {
-				try {
-					Player player = (Player) commandContext.getSender();
-					RayTraceResult result = player.getWorld().rayTrace(player.getEyeLocation(),
-							player.getEyeLocation().getDirection(), 50, FluidCollisionMode.NEVER, false, 0,
-							Predicates.alwaysFalse());
-					if (result != null && result.getHitBlock() != null) {
-						Block block = result.getHitBlock();
-						if (block instanceof Sign) {
-							Sign sign = (Sign) block;
-							sign.setGlowingText(!sign.isGlowingText());
+							sign.setBlockData(block.getBlockData());
 						}
 						else
 							sendMessage(player, "You are not looking at a sign");
@@ -1406,8 +1401,27 @@ public class RedfixPlugin extends JavaPlugin {
 				} catch (Exception ignored) {
 				}
 				return true;
-			});
-			commandManager.register(builder);
+			}));
+			commandManager.register(builder.subCommand("glow").handler(commandContext -> {
+				try {
+					Player player = (Player) commandContext.getSender();
+					RayTraceResult result = player.rayTraceBlocks(10, FluidCollisionMode.NEVER);
+					if (result != null && result.getHitBlock() != null) {
+						Block block = result.getHitBlock();
+						if (block.getState() instanceof Sign sign)
+							sign.setGlowingText(!sign.isGlowingText());
+						else
+							sendMessage(player, "You are not looking at a sign");
+						
+						if (block.getWorld().getBlockState(block.getLocation()) instanceof Sign sign)
+							sign.setGlowingText(!sign.isGlowingText());
+					}
+					else
+						sendMessage(player, "You are not looking at any block");
+				} catch (Exception ignored) {
+				}
+				return true;
+			}));
 		}
 		
 		//ClearChat
@@ -1794,11 +1808,7 @@ public class RedfixPlugin extends JavaPlugin {
 					"bc").permission("redfix.command.broadcast").argument(StringArrayArgument.of("message")).handler(
 					commandContext -> {
 						String[] msg = commandContext.get("message");
-						String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
-							sb.append(s);
-							sb.append(" ");
-						}, StringBuilder::append).toString().replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])",
-								"§$1").replaceAll("&§§", "&");
+						String message = applyColor(String.join(" ", msg), "§a");
 						Bukkit.broadcastMessage("§6[§4Broadcast§6] §a" + message);
 						return true;
 					});
@@ -1917,8 +1927,7 @@ public class RedfixPlugin extends JavaPlugin {
 					StringArrayArgument.of("message").optional()).handler(commandContext -> {
 				Player player = commandContext.get("player");
 				String[] smsg = commandContext.getOrDefault("message", new String[0]);
-				String message0 = String.join(" ", smsg);
-				String message = message0.replaceAll("&", "§");
+				String message = applyColor(String.join(" ", smsg));
 				Bukkit.getScheduler().runTask(this, () -> player.kickPlayer(message));
 				return true;
 			});
@@ -1932,8 +1941,7 @@ public class RedfixPlugin extends JavaPlugin {
 					StringArrayArgument.of("message").optional()).handler(commandContext -> {
 				OfflinePlayer player = commandContext.get("player");
 				String[] smsg = commandContext.getOrDefault("message", new String[0]);
-				String message0 = String.join(" ", smsg);
-				String message = message0.replaceAll("&", "§");
+				String message = applyColor(String.join(" ", smsg));
 				Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), message, null, null).save();
 				if (player.isOnline())
 					Bukkit.getScheduler().runTask(this, () -> player.getPlayer().kickPlayer(message));
@@ -2033,83 +2041,75 @@ public class RedfixPlugin extends JavaPlugin {
 				String[] msg = commandContext.get("message");
 				Player player = commandContext.get("player");
 				Player sender = (Player) commandContext.getSender();
-				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
-					sb.append(s);
-					sb.append(" ");
-				}, StringBuilder::append).toString();
+				String message = applyColor(String.join(" ", msg));
 				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
 				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
 				if (vaultChat != null) {
-					player.sendMessage(("§7[§5" + vaultChat.getPlayerPrefix(sender) + Objects.requireNonNullElse(
-							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
-							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(("§7[§5" + applyColor(vaultChat.getPlayerPrefix(sender), "§5") + applyColor(
+							Objects.requireNonNullElse(sender.getDisplayName(), sender.getName()), "§5") + applyColor(
+							vaultChat.getPlayerSuffix(sender), "§5") + " §6-> §4me§7] §f" + message));
 					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(
-								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
-										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
-										player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-										"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+								("§7[§4I §6-> §5" + applyColor(vaultChat.getPlayerPrefix(player), "§5") + applyColor(
+										Objects.requireNonNullElse(player.getDisplayName(), player.getName()),
+										"§5") + applyColor(vaultChat.getPlayerSuffix(player),
+										"§5") + "§7] §f" + message));
 				}
 				else {
-					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
-							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(
+							("§7[§5" + applyColor(Objects.requireNonNullElse(sender.getDisplayName(), sender.getName()),
+									"§5") + " §6-> §4me§7] §f" + message));
 					if (canSee((Player) commandContext.getSender(), player))
-						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
-								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+						sender.sendMessage(("§7[§4I §6-> §5" + applyColor(
+								Objects.requireNonNullElse(player.getDisplayName(), player.getName()),
+								"§5") + "§7] §f" + message));
 				}
 				return true;
 			});
 			commandManager.register(builder);
 		}
 		
-		//Re
+		//Respond
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("r").permission(
 					"redfix.command.msg").argument(StringArrayArgument.of("message")).handler(commandContext -> {
 				String[] msg = commandContext.get("message");
 				Player sender = (Player) commandContext.getSender();
 				if (!lastMessaged.containsKey(sender.getUniqueId())) {
-					sendMessage(sender, "Du hast keinen Dialog mit einem Spieler.");
+					sendMessage(sender, "You don't have an active dialoge!");
 					return false;
 				}
 				UUID target = lastMessaged.get(sender.getUniqueId());
 				Player player = Bukkit.getPlayer(target);
 				if (player == null) {
-					sendMessage(sender, "Der Spieler ist nicht online.");
+					sendMessage(sender, "The player isn't online!");
 					return false;
 				}
 				if (!canSee(sender, player))
-					sendMessage(sender, "Der Spieler ist nicht online.");
+					sendMessage(sender, "The player isn't online!");
 				
-				String message = Arrays.stream(msg).collect(StringBuilder::new, (sb, s) -> {
-					sb.append(s);
-					sb.append(" ");
-				}, StringBuilder::append).toString();
+				String message = applyColor(String.join(" ", msg));
 				lastMessaged.put(player.getUniqueId(), sender.getUniqueId());
 				lastMessaged.put(sender.getUniqueId(), player.getUniqueId());
 				if (vaultChat != null) {
-					player.sendMessage(("§7[§5" + vaultChat.getPlayerPrefix(sender) + Objects.requireNonNullElse(
-							sender.getDisplayName(), sender.getName()) + vaultChat.getPlayerSuffix(
-							sender) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(("§7[§5" + applyColor(vaultChat.getPlayerPrefix(sender), "§5") + applyColor(
+							Objects.requireNonNullElse(sender.getDisplayName(), sender.getName()), "§5") + applyColor(
+							vaultChat.getPlayerSuffix(sender), "§5") + " §6-> §4me§7] §f" + message));
 					if (canSee((Player) commandContext.getSender(), player))
 						sender.sendMessage(
-								("§7[§4I §6-> §5" + vaultChat.getPlayerPrefix(player) + Objects.requireNonNullElse(
-										player.getDisplayName(), player.getName()) + vaultChat.getPlayerSuffix(
-										player) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-										"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+								("§7[§4I §6-> §5" + applyColor(vaultChat.getPlayerPrefix(player), "§5") + applyColor(
+										Objects.requireNonNullElse(player.getDisplayName(), player.getName()),
+										"§5") + applyColor(vaultChat.getPlayerSuffix(player),
+										"§5") + "§7] §f" + message));
 				}
 				else {
-					player.sendMessage(("§7[§5" + Objects.requireNonNullElse(sender.getDisplayName(),
-							sender.getName()) + " §6-> §4me§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-							"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+					player.sendMessage(
+							("§7[§5" + applyColor(Objects.requireNonNullElse(sender.getDisplayName(), sender.getName()),
+									"§5") + " §6-> §4me§7] §f" + message));
 					if (canSee((Player) commandContext.getSender(), player))
-						sender.sendMessage(("§7[§4I §6-> §5" + Objects.requireNonNullElse(player.getDisplayName(),
-								player.getName()) + "§7] §f" + message).replaceAll("&&", "&§§").replaceAll(
-								"&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&"));
+						sender.sendMessage(("§7[§4I §6-> §5" + applyColor(
+								Objects.requireNonNullElse(player.getDisplayName(), player.getName()),
+								"§5") + "§7] §f" + message));
 				}
 				return true;
 			});
@@ -2320,28 +2320,170 @@ public class RedfixPlugin extends JavaPlugin {
 		//KillAll
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("killall").permission(
-					"redfix.command.killall").argument(EntityTypeArgument.of("type").optional()).handler(
-					commandContext -> {
-						Bukkit.getScheduler().runTask(this, () -> {
-							Player sender = (Player) commandContext.getSender();
-							if (commandContext.contains("type")) {
-								EntityType type = commandContext.get("type");
-								Stream<Entity> entityStream = sender.getWorld().getEntities().stream().filter(
-										e -> e.getType() == type).filter(e -> e.getType() != EntityType.PLAYER);
-								List<Entity> entities = entityStream.toList();
-								entities.forEach(Entity::remove);
-								sendMessage(sender, "Removed " + entities.size() + " Entities");
+					"redfix.command.killall").flag(
+					FrameworkFlag.of("kill").setDescription("Kill the Mobs instead of removing them")).flag(
+					FrameworkFlag.of("everywhere").setDescription("Remove the Entities in all worlds")).flag(
+					FrameworkFlag.of("tamed").setDescription("Also remove tamed Mobs")).argument(
+					EntityTypeArgument.of("type").optional(), "The Type of the Entity").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player sender = (Player) commandContext.getSender();
+					boolean tamed = commandContext.getFlag("tamed");
+					boolean kill = commandContext.getFlag("kill");
+					boolean everywhere = commandContext.getFlag("everywhere");
+					if (commandContext.contains("type")) {
+						EntityType type = commandContext.get("type");
+						Stream<Entity> entityStream;
+						if (everywhere)
+							entityStream = Bukkit.getWorlds().stream().map(World::getEntities).flatMap(
+									List::stream).filter(e -> e.getType() == type).filter(
+									e -> e.getType() != EntityType.PLAYER);
+						else
+							entityStream = sender.getWorld().getEntities().stream().filter(
+									e -> e.getType() == type).filter(e -> e.getType() != EntityType.PLAYER);
+						if (!tamed)
+							entityStream = entityStream.filter(e -> {
+								if (e instanceof Tameable t) {
+									return !t.isTamed();
+								}
+								return true;
+							});
+						if (kill)
+							entityStream.forEach(e -> {
+								if (e instanceof LivingEntity le)
+									le.damage(le.getHealth() + le.getAbsorptionAmount() + 1000);
+								else
+									e.remove();
+							});
+						else
+							entityStream.forEach(Entity::remove);
+						sendMessage(sender, "Removed " + entityStream.count() + " Entities");
+					}
+					else {
+						Stream<Mob> entityStream;
+						if (everywhere)
+							entityStream = Bukkit.getWorlds().stream().map(World::getLivingEntities).flatMap(
+									List::stream).filter(e -> e instanceof Mob).map(e -> (Mob) e);
+						else
+							entityStream = sender.getWorld().getLivingEntities().stream().filter(
+									e -> e instanceof Mob).map(e -> (Mob) e);
+						entityStream = entityStream.filter(
+								e -> e.getType() != EntityType.VILLAGER && e.getType() != EntityType.ZOMBIE_VILLAGER);
+						if (!tamed)
+							entityStream = entityStream.filter(e -> {
+								if (e instanceof Tameable t) {
+									return !t.isTamed();
+								}
+								return true;
+							});
+						if (kill)
+							entityStream.forEach(e -> e.damage(e.getHealth() + e.getAbsorptionAmount() + 1000));
+						else
+							entityStream.forEach(Entity::remove);
+						Component hoverComponent = Component.empty();
+						for (EntityType type : EntityType.values()) {
+							long amount = entityStream.filter(e -> e.getType() == type).count();
+							if (amount > 0) {
+								if (tamed && Tameable.class.isAssignableFrom(type.getEntityClass())) {
+									hoverComponent.append(Component.text(amount).append(Component.text(' ')).append(
+											Component.translatable(type.translationKey())).append(
+											Component.text(" (").append(Component.text(
+													entityStream.filter(e -> e.getType() == type).filter(
+															e -> ((Tameable) e).isTamed()).count())).append(
+													Component.text(" tamed)")))).append(Component.text("\n"));
+								}
+								else {
+									hoverComponent.append(Component.text(amount).append(Component.text(' ')).append(
+											Component.translatable(type.translationKey()))).append(
+											Component.text("\n"));
+								}
 							}
-							else {
-								Stream<LivingEntity> entityStream = sender.getWorld().getLivingEntities().stream().filter(
-										e -> e instanceof Mob);
-								List<LivingEntity> entities = entityStream.toList();
-								entities.forEach(LivingEntity::remove);
-								sendMessage(sender, "Removed " + entities.size() + " Entities");
+						}
+						sendMessage(sender, Component.text("Removed " + entityStream.count() + " Entities").hoverEvent(
+								HoverEvent.showText(hoverComponent)));
+					}
+				});
+				return true;
+			});
+			commandManager.register(builder);
+		}
+		
+		//KillNear
+		{
+			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("killnear").permission(
+					"redfix.command.killall").argument(DoubleArgument.of("radius")).flag(
+					FrameworkFlag.of("kill").setDescription("Kill the Mobs instead of removing them")).flag(
+					FrameworkFlag.of("tamed").setDescription("Also remove tamed Mobs")).argument(
+					EntityTypeArgument.of("type").optional(), "The Type of the Entity").handler(commandContext -> {
+				Bukkit.getScheduler().runTask(this, () -> {
+					Player sender = (Player) commandContext.getSender();
+					boolean tamed = commandContext.getFlag("tamed");
+					boolean kill = commandContext.getFlag("kill");
+					double radius = commandContext.getArgument("radius");
+					if (commandContext.contains("type")) {
+						EntityType type = commandContext.get("type");
+						Stream<Entity> entityStream = sender.getNearbyEntities(radius, radius, radius).stream().filter(
+								e -> e.getLocation().distance(sender.getLocation()) <= radius).filter(
+								e -> e.getType() == type).filter(e -> e.getType() != EntityType.PLAYER);
+						if (!tamed)
+							entityStream = entityStream.filter(e -> {
+								if (e instanceof Tameable t) {
+									return !t.isTamed();
+								}
+								return true;
+							});
+						if (kill)
+							entityStream.forEach(e -> {
+								if (e instanceof LivingEntity le)
+									le.damage(le.getHealth() + le.getAbsorptionAmount() + 1000);
+								else
+									e.remove();
+							});
+						else
+							entityStream.forEach(Entity::remove);
+						sendMessage(sender, "Removed " + entityStream.count() + " Entities");
+					}
+					else {
+						Stream<Mob> entityStream = sender.getNearbyEntities(radius, radius, radius).stream().filter(
+								e -> e.getLocation().distance(sender.getLocation()) <= radius).filter(
+								e -> e instanceof Mob).map(e -> (Mob) e);
+						entityStream = entityStream.filter(
+								e -> e.getType() != EntityType.VILLAGER && e.getType() != EntityType.ZOMBIE_VILLAGER);
+						if (!tamed)
+							entityStream = entityStream.filter(e -> {
+								if (e instanceof Tameable t) {
+									return !t.isTamed();
+								}
+								return true;
+							});
+						if (kill)
+							entityStream.forEach(e -> e.damage(e.getHealth() + e.getAbsorptionAmount() + 1000));
+						else
+							entityStream.forEach(Entity::remove);
+						Component hoverComponent = Component.empty();
+						for (EntityType type : EntityType.values()) {
+							long amount = entityStream.filter(e -> e.getType() == type).count();
+							if (amount > 0) {
+								if (tamed && Tameable.class.isAssignableFrom(type.getEntityClass())) {
+									hoverComponent.append(Component.text(amount).append(Component.text(' ')).append(
+											Component.translatable(type.translationKey())).append(
+											Component.text(" (").append(Component.text(
+													entityStream.filter(e -> e.getType() == type).filter(
+															e -> ((Tameable) e).isTamed()).count())).append(
+													Component.text(" tamed)")))).append(Component.text("\n"));
+								}
+								else {
+									hoverComponent.append(Component.text(amount).append(Component.text(' ')).append(
+											Component.translatable(type.translationKey()))).append(
+											Component.text("\n"));
+								}
 							}
-						});
-						return true;
-					});
+						}
+						sendMessage(sender, Component.text("Removed " + entityStream.count() + " Entities").hoverEvent(
+								HoverEvent.showText(hoverComponent)));
+					}
+				});
+				return true;
+			});
 			commandManager.register(builder);
 		}
 		
@@ -2885,6 +3027,22 @@ public class RedfixPlugin extends JavaPlugin {
 		return in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build()).replaceText(
 				TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build()).replaceText(
 				TextReplacementConfig.builder().match("&§§").replacement("&").build());
+	}
+	
+	public static Component applyColor(Component in, String defaultColor) {
+		return in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build()).replaceText(
+				TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build()).replaceText(
+				TextReplacementConfig.builder().match("&§§").replacement("&").build()).replaceText(
+				TextReplacementConfig.builder().match("§r").replacement(defaultColor).build());
+	}
+	
+	public static String applyColor(String in, String defaultColor) {
+		return in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&").replaceAll("§r",
+				defaultColor);
+	}
+	
+	public static String applyColor(String in) {
+		return in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1").replaceAll("&§§", "&");
 	}
 	
 	public static boolean isEconomyEnabled() {

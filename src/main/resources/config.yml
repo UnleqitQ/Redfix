@@ -10,9 +10,11 @@ chat:
   #-1 For disable
   distance: -1
   shout:
+    enabled: false
     prefix: "§a[Shout] "
     name: "Shout"
   ask:
+    enabled: false
     prefix: "§9[Question] "
     name: "Question"
 
@@ -33,3 +35,15 @@ commands:
     cooldown: 10
 
 auto-unlock-recipes: false
+
+mysql:
+  enabled: true
+  host: "localhost"
+  port: 3306
+  database: "Minecraft_Network"
+  username: "mcnetwork"
+  password: "l9wAS?3oO+1!B0wFjQ#&"
+  prefix: "rf_"
+  modules:
+    economy: true
+

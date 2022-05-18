@@ -11,6 +11,7 @@ softdepend:
   - SuperVanish
   - PremiumVanish
   - CustomPotionEffectAPI
+  - PlaceholderAPI
 
 permissions:
   redfix.command.commandspy:

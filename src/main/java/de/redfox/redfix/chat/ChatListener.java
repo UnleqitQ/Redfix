@@ -1,6 +1,7 @@
 package de.redfox.redfix.chat;
 
 import de.redfox.redfix.RedfixPlugin;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.TextReplacementConfig;
@@ -12,7 +13,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.jetbrains.annotations.NotNull;
 
 public class ChatListener implements Listener {
@@ -146,9 +146,8 @@ public class ChatListener implements Listener {
 	}*/
 	
 	@EventHandler (priority = EventPriority.LOW, ignoreCancelled = true)
-	public void onChat(@NotNull AsyncPlayerChatEvent event) {
-		event.setCancelled(true);
-		Component msg = Component.text(ChatColor.translateAlternateColorCodes('&', event.getMessage()));
+	public void onChat(@NotNull AsyncChatEvent event) {
+		Component msg = RedfixPlugin.applyColor(event.message());
 		Player player = event.getPlayer();
 		if (RedfixPlugin.muted.containsKey(player.getUniqueId())) {
 			long until = RedfixPlugin.muted.get(player.getUniqueId());
@@ -171,7 +170,8 @@ public class ChatListener implements Listener {
 		if (nm0 == null)
 			nm0 = player.getDisplayName();
 		Component nm = Component.text(ChatColor.translateAlternateColorCodes('&', nm0));
-		if (event.getMessage().startsWith("!")) {
+		if (RedfixPlugin.getInstance().getConfig().getBoolean("chat.shout.enabled",
+				false) && ((TextComponent) event.message()).content().startsWith("!")) {
 			msg = msg.replaceText(TextReplacementConfig.builder().match("!").replacement("").once().build());
 			Component component = Component.text("");
 			TextComponent shout = Component.text(
@@ -186,7 +186,8 @@ public class ChatListener implements Listener {
 			Bukkit.broadcast(RedfixPlugin.applyColor(component));
 			//event.getRecipients().forEach(p -> p.sendMessage(msg));
 		}
-		else if (event.getMessage().startsWith("?")) {
+		else if (RedfixPlugin.getInstance().getConfig().getBoolean("chat.ask.enabled",
+				false) && ((TextComponent) event.message()).content().startsWith("?")) {
 			msg = msg.replaceText(TextReplacementConfig.builder().match("\\?").replacement("").once().build());
 			Component component = Component.text("");
 			TextComponent shout = Component.text(
@@ -218,6 +219,7 @@ public class ChatListener implements Listener {
 								player.getLocation()) < dist)).forEach(p -> p.sendMessage(cmp));
 			}
 		}
+		event.setCancelled(true);
 	}
 	
 }

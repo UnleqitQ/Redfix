@@ -46,22 +46,22 @@ public class Nick implements Listener, PacketListener {
 	public static void update(Player player) {
 		if (nicks.containsKey(player.getUniqueId())) {
 			String nick = nicks.get(player.getUniqueId());
-			player.setDisplayName(nick);
-			player.setCustomName(nick);
-			player.setPlayerListName(nick);
-			player.customName(Component.text(nick));
-			player.playerListName(Component.text(nick));
-			player.displayName(Component.text(nick));
+			player.setDisplayName(RedfixPlugin.applyColor(nick));
+			player.setCustomName(RedfixPlugin.applyColor(nick));
+			player.setPlayerListName(RedfixPlugin.applyColor(nick));
+			player.customName(Component.text(RedfixPlugin.applyColor(nick)));
+			player.playerListName(Component.text(RedfixPlugin.applyColor(nick)));
+			player.displayName(Component.text(RedfixPlugin.applyColor(nick)));
 			player.setCustomNameVisible(true);
 		}
 		else {
 			String nick = player.getName();
-			player.setDisplayName(nick);
-			player.setCustomName(nick);
-			player.setPlayerListName(nick);
-			player.customName(Component.text(nick));
-			player.playerListName(Component.text(nick));
-			player.displayName(Component.text(nick));
+			player.setDisplayName(RedfixPlugin.applyColor(nick));
+			player.setCustomName(RedfixPlugin.applyColor(nick));
+			player.setPlayerListName(RedfixPlugin.applyColor(nick));
+			player.customName(Component.text(RedfixPlugin.applyColor(nick)));
+			player.playerListName(Component.text(RedfixPlugin.applyColor(nick)));
+			player.displayName(Component.text(RedfixPlugin.applyColor(nick)));
 			player.setCustomNameVisible(true);
 		}
 	}
