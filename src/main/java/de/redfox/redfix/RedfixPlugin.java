@@ -32,6 +32,7 @@ import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.md_5.bungee.api.ChatColor;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
@@ -70,6 +71,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class RedfixPlugin extends JavaPlugin {
@@ -3119,25 +3122,38 @@ public class RedfixPlugin extends JavaPlugin {
 	}
 	
 	public static Component applyColor(Component in) {
-		return in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
-				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl#])").replacement("§$1").build())
-				.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build());
+		Component v = in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
+				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build());
+		v = v.replaceText(TextReplacementConfig.builder().match("&#[A-Fa-f0-6]{6}")
+				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group())))).build());
+		return v.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build());
 	}
 	
 	public static Component applyColor(Component in, String defaultColor) {
-		return in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
-				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl#])").replacement("§$1").build())
-				.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build())
+		Component v = in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
+				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build());
+		v = v.replaceText(TextReplacementConfig.builder().match("&#[A-Fa-f0-6]{6}")
+				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group())))).build());
+		return v.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build())
 				.replaceText(TextReplacementConfig.builder().match("§r").replacement(defaultColor).build());
 	}
 	
 	public static String applyColor(String in, String defaultColor) {
-		return in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl#])", "§$1").replaceAll("&§§", "&")
-				.replaceAll("§r", defaultColor);
+		String v = in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1");
+		Matcher matcher = Pattern.compile("&#[A-Fa-f0-6]{6}").matcher(v);
+		while (matcher.find()) {
+			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group()));
+		}
+		return v.replaceAll("&§§", "&").replaceAll("§r", defaultColor);
 	}
 	
 	public static String applyColor(String in) {
-		return in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl#])", "§$1").replaceAll("&§§", "&");
+		String v = in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1");
+		Matcher matcher = Pattern.compile("&#[A-Fa-f0-6]{6}").matcher(v);
+		while (matcher.find()) {
+			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group()));
+		}
+		return v.replaceAll("&§§", "&");
 	}
 	
 	public static boolean isEconomyEnabled() {
