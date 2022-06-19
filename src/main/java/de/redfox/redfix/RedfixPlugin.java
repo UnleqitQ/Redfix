@@ -3125,7 +3125,7 @@ public class RedfixPlugin extends JavaPlugin {
 		Component v = in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
 				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build());
 		v = v.replaceText(TextReplacementConfig.builder().match("&#[A-Fa-f0-6]{6}")
-				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group().substring(2))))).build());
+				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group().substring(1))))).build());
 		return v.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build());
 	}
 	
@@ -3133,7 +3133,7 @@ public class RedfixPlugin extends JavaPlugin {
 		Component v = in.replaceText(TextReplacementConfig.builder().match("&&").replacement("&§§").build())
 				.replaceText(TextReplacementConfig.builder().match("&([0-9a-fkomnrl])").replacement("§$1").build());
 		v = v.replaceText(TextReplacementConfig.builder().match("&#[A-Fa-f0-6]{6}")
-				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group().substring(2))))).build());
+				.replacement((r, c) -> Component.text(String.valueOf(ChatColor.of(r.group().substring(1))))).build());
 		return v.replaceText(TextReplacementConfig.builder().match("&§§").replacement("&").build())
 				.replaceText(TextReplacementConfig.builder().match("§r").replacement(defaultColor).build());
 	}
@@ -3142,7 +3142,7 @@ public class RedfixPlugin extends JavaPlugin {
 		String v = in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1");
 		Matcher matcher = Pattern.compile("&#[A-Fa-f0-6]{6}").matcher(v);
 		while (matcher.find()) {
-			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group().substring(2)));
+			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group().substring(1)));
 		}
 		return v.replaceAll("&§§", "&").replaceAll("§r", defaultColor);
 	}
@@ -3151,7 +3151,7 @@ public class RedfixPlugin extends JavaPlugin {
 		String v = in.replaceAll("&&", "&§§").replaceAll("&([0-9a-fkomnrl])", "§$1");
 		Matcher matcher = Pattern.compile("&#[A-Fa-f0-6]{6}").matcher(v);
 		while (matcher.find()) {
-			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group().substring(2)));
+			v = v.replace(matcher.group(), "" + ChatColor.of(matcher.group().substring(1)));
 		}
 		return v.replaceAll("&§§", "&");
 	}
