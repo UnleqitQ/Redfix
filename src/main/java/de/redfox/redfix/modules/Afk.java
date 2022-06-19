@@ -67,12 +67,16 @@ public class Afk implements Listener, PacketListener {
 	}
 	
 	public static boolean isAfk(UUID player) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return false;
 		if (!afkTimes.containsKey(player))
 			return false;
 		return System.currentTimeMillis() - afkTimes.get(player) > 5 * 60 * 1000;
 	}
 	
 	public static void check() {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		for (Map.Entry<UUID, Long> entry : afkTimes.entrySet()) {
 			if (isAfk(entry.getKey()) && !registered.contains(entry.getKey())) {
 				Player player = Bukkit.getPlayer(entry.getKey());
@@ -94,16 +98,22 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		afkTimes.put(event.getPlayer().getUniqueId(), System.currentTimeMillis());
 	}
 	
 	@EventHandler
 	public void onQuit(PlayerQuitEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		afkTimes.remove(event.getPlayer().getUniqueId());
 	}
 	
 	@EventHandler
 	public void onMove(PlayerMoveEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		/*if (event.getFrom().distance(event.getPlayer().getLocation()) > 0.01)
 			afkTimes.put(event.getPlayer().getUniqueId(), System.currentTimeMillis());*/
 		if (isAfk(event.getPlayer().getUniqueId())) {
@@ -115,6 +125,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onDamage(EntityDamageEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (event.getEntityType() == EntityType.PLAYER && isAfk(event.getEntity().getUniqueId())) {
 			event.setCancelled(true);
 		}
@@ -122,6 +134,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onPickup(PlayerAttemptPickupItemEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (isAfk(event.getPlayer().getUniqueId())) {
 			event.setCancelled(true);
 		}
@@ -129,6 +143,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onPickup(PlayerPickupArrowEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (isAfk(event.getPlayer().getUniqueId())) {
 			event.setCancelled(true);
 		}
@@ -136,6 +152,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onVelocity(PlayerVelocityEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (isAfk(event.getPlayer().getUniqueId())) {
 			event.setVelocity(new Vector());
 		}
@@ -156,6 +174,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@Override
 	public void onPacketReceiving(PacketEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (event.getPacketType() == PacketType.Play.Client.POSITION) {
 			if (isAfk(event.getPlayer().getUniqueId())) {
 				double x = event.getPacket().getDoubles().read(0);
@@ -194,6 +214,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onTarget(@NotNull EntityTargetLivingEntityEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (event.getTarget() != null && event.getTarget().getType() == EntityType.PLAYER)
 			if (isAfk(event.getTarget().getUniqueId()))
 				event.setCancelled(true);
@@ -201,6 +223,8 @@ public class Afk implements Listener, PacketListener {
 	
 	@EventHandler
 	public void onTarget(@NotNull EntityTargetEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("afk.enabled", false))
+			return;
 		if (event.getTarget() != null && event.getTarget().getType() == EntityType.PLAYER)
 			if (isAfk(event.getTarget().getUniqueId()))
 				event.setCancelled(true);

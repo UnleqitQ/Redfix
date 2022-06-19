@@ -147,6 +147,8 @@ public class ChatListener implements Listener {
 	
 	@EventHandler (priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onChat(@NotNull AsyncChatEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("chat.enabled", true))
+			return;
 		Component msg = RedfixPlugin.applyColor(event.message());
 		Player player = event.getPlayer();
 		if (RedfixPlugin.muted.containsKey(player.getUniqueId())) {
@@ -161,15 +163,15 @@ public class ChatListener implements Listener {
 		Component namePrefix = Component.text("");
 		Component nameSuffix = Component.text("");
 		if (RedfixPlugin.getInstance().vaultChat != null) {
-			namePrefix = Component.text(ChatColor.translateAlternateColorCodes('&',
+			namePrefix = Component.text(RedfixPlugin.applyColor(
 					RedfixPlugin.getInstance().vaultChat.getPlayerPrefix(player)));
-			nameSuffix = Component.text(ChatColor.translateAlternateColorCodes('&',
+			nameSuffix = Component.text(RedfixPlugin.applyColor(
 					RedfixPlugin.getInstance().vaultChat.getPlayerSuffix(player)));
 		}
 		String nm0 = player.getCustomName();
 		if (nm0 == null)
 			nm0 = player.getDisplayName();
-		Component nm = Component.text(ChatColor.translateAlternateColorCodes('&', nm0));
+		Component nm = Component.text(RedfixPlugin.applyColor(nm0));
 		if (RedfixPlugin.getInstance().getConfig().getBoolean("chat.shout.enabled",
 				false) && ((TextComponent) event.message()).content().startsWith("!")) {
 			msg = msg.replaceText(TextReplacementConfig.builder().match("!").replacement("").once().build());

@@ -6,7 +6,11 @@ commandspy:
   enable: "§7CommandSpy wurde §eaktiviert"
   disable: "§7CommandSpy wurde §edeaktiviert"
 
+afk:
+  enabled: false
+
 chat:
+  enabled: false
   #-1 For disable
   distance: -1
   shout:
@@ -37,13 +41,18 @@ commands:
 auto-unlock-recipes: false
 
 mysql:
-  enabled: true
+  enabled: false
   host: "localhost"
   port: 3306
-  database: "Minecraft_Network"
-  username: "mcnetwork"
-  password: "l9wAS?3oO+1!B0wFjQ#&"
+  database: "minecraft"
+  username: "root"
+  password: ""
   prefix: "rf_"
   modules:
-    economy: true
+    economy: false
+    nick: false
 
+color:
+  anvil: false
+  sign: false
+  book: false

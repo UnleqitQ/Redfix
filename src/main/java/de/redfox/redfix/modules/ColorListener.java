@@ -1,5 +1,6 @@
 package de.redfox.redfix.modules;
 
+import de.redfox.redfix.RedfixPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.event.EventHandler;
@@ -17,6 +18,7 @@ public class ColorListener implements Listener {
 	
 	@EventHandler (priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onAnvil(PrepareAnvilEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("color.anvil", false)) return;
 		if (event.getInventory().getRenameText() != null && !event.getInventory().getRenameText().isBlank()) {
 			ItemStack r = event.getResult();
 			if (r == null)
@@ -30,6 +32,7 @@ public class ColorListener implements Listener {
 	
 	@EventHandler (priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onSign(SignChangeEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("color.sign", false)) return;
 		for (int i = 0; i < event.getLines().length; i++) {
 			String l = event.getLines()[i];
 			l = ChatColor.translateAlternateColorCodes('&', l);
@@ -39,6 +42,7 @@ public class ColorListener implements Listener {
 	
 	@EventHandler (priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onBook(PlayerEditBookEvent event) {
+		if (!RedfixPlugin.getInstance().getConfig().getBoolean("color.book", false)) return;
 		if (event.isSigning()) {
 			BookMeta meta = event.getNewBookMeta();
 			for (int i = 0; i < meta.getPageCount(); i++) {
