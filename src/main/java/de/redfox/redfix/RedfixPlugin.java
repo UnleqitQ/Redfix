@@ -10,13 +10,14 @@ import de.redfox.redfix.config.ConfigManager;
 import de.redfox.redfix.economy.EconomyManager;
 import de.redfox.redfix.economy.VaultEconomy;
 import de.redfox.redfix.modules.*;
+import de.redfox.redfix.modules.abilityfixer.AbilityFixer;
+import de.redfox.redfix.modules.abilityfixer.AbilityFixer_1_18;
 import de.redfox.redfix.modules.inv.ChestManager;
 import de.redfox.redfix.modules.jail.Jail;
 import de.redfox.redfix.modules.jail.JailHandler;
 import de.redfox.redfix.modules.jail.JailedPlayer;
-import de.redfox.redfix.utils.PlayerWeatherType;
-import de.redfox.redfix.utils.RfSql;
 import de.redfox.redfix.utils.WeatherType;
+import de.redfox.redfix.utils.*;
 import me.unleqitq.commandframework.CommandContext;
 import me.unleqitq.commandframework.CommandManager;
 import me.unleqitq.commandframework.CommandNode;
@@ -44,7 +45,6 @@ import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
@@ -89,7 +89,9 @@ public class RedfixPlugin extends JavaPlugin {
 	public VaultEconomy vaultEconomy;
 	public Economy mainEconomy;
 	public Afk afk;
-	Nick nick;
+	public Nick nick;
+	public AbilityFixer abilityFixer;
+	public OpFixer opFixer;
 	public static Map<UUID, Long> muted = new HashMap<>();
 	public static CommandManager commandManager;
 	
@@ -115,6 +117,20 @@ public class RedfixPlugin extends JavaPlugin {
 		//WorthCalculator.reset();
 		//WorthCalculator.calculate();
 		
+		try {
+			NMSHandler.init();
+			abilityFixer = new AbilityFixer();
+			ProtocolLibrary.getProtocolManager().addPacketListener(abilityFixer);
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+			if (NMSHandler.version == Version.SERVER_1_18 || NMSHandler.version == Version.SERVER_1_18_1 ||
+					NMSHandler.version == Version.SERVER_1_18_2) {
+				abilityFixer = new AbilityFixer_1_18();
+				ProtocolLibrary.getProtocolManager().addPacketListener(abilityFixer);
+			}
+		}
+		
 		saveDataFolder = new File(getDataFolder(), "data");
 		saveDataFolder.mkdirs();
 		
@@ -128,11 +144,13 @@ public class RedfixPlugin extends JavaPlugin {
 		loadAll();
 		nick = new Nick();
 		afk = new Afk();
+		opFixer = new OpFixer();
 		Bukkit.getPluginManager().registerEvents(afk, this);
 		Bukkit.getPluginManager().registerEvents(new JoinQuitListener(), this);
 		Bukkit.getPluginManager().registerEvents(new Freeze(), this);
 		Bukkit.getPluginManager().registerEvents(new ColorListener(), this);
 		Bukkit.getPluginManager().registerEvents(new InstaBreak(), this);
+		Bukkit.getPluginManager().registerEvents(opFixer, this);
 		new God();
 		Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
 		Bukkit.getPluginManager().registerEvents(nick, this);
@@ -179,7 +197,8 @@ public class RedfixPlugin extends JavaPlugin {
 					sql.createTable("economy",
 							List.of(new RfSql.ColumnData("UUID", "VARCHAR(36)").setNotNull().setUnique(),
 									new RfSql.ColumnData("money", "DOUBLE").setNotNull()), "UUID");
-				} catch (SQLException e) {
+				}
+				catch (SQLException e) {
 					e.printStackTrace();
 				}
 			}
@@ -188,7 +207,8 @@ public class RedfixPlugin extends JavaPlugin {
 					sql.createTable("nick",
 							List.of(new RfSql.ColumnData("UUID", "VARCHAR(36)").setNotNull().setUnique(),
 									new RfSql.ColumnData("nick", "TEXT")), "UUID");
-				} catch (SQLException e) {
+				}
+				catch (SQLException e) {
 					e.printStackTrace();
 				}
 			}
@@ -358,7 +378,20 @@ public class RedfixPlugin extends JavaPlugin {
 					//.argument(PlayerArgument.of("player"))
 					.handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player target;
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (sender instanceof Player p)
+							target = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(target.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.god.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.god.others");
+							return false;
+						}
 						if (God.players.containsKey(target.getUniqueId())) {
 							God.players.remove(target.getUniqueId());
 							sendMessage(sender, "Disabled God");
@@ -428,7 +461,20 @@ public class RedfixPlugin extends JavaPlugin {
 					.flag(FrameworkFlag.of("particle").setDescription("Spawn a heart particle"))
 					.argument(PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player target;
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (sender instanceof Player p)
+							target = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(target.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.heal.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.heal.others");
+							return false;
+						}
 						target.setHealth(target.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue());
 						target.setExhaustion(0);
 						target.setSaturation(20);
@@ -449,7 +495,20 @@ public class RedfixPlugin extends JavaPlugin {
 			builder = builder.permission("redfix.command.saturation")
 					.argument(PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player target;
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (sender instanceof Player p)
+							target = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(target.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.saturation.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.saturation.others");
+							return false;
+						}
 						target.setExhaustion(0);
 						target.setSaturation(20);
 						target.setFoodLevel(20);
@@ -466,7 +525,21 @@ public class RedfixPlugin extends JavaPlugin {
 					builder.permission("redfix.command.fly").argument(PlayerArgument.of("player").optional(), "player")
 							.handler(commandContext -> {
 								CommandSender sender = commandContext.getSender();
-								Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+								Player target;
+								if (commandContext.hasArgument("player"))
+									target = commandContext.get("player");
+								else if (sender instanceof Player p)
+									target = p;
+								else {
+									sendMessage(sender, "&4Please provide a player");
+									return false;
+								}
+								if (sender instanceof Player psender &&
+										!psender.getUniqueId().equals(target.getUniqueId()) &&
+										!psender.hasPermission("redfix.command.fly.others")) {
+									CommandUtils.printMissingPermission(sender, "redfix.command.fly.others");
+									return false;
+								}
 								target.setAllowFlight(!target.getAllowFlight());
 								sendMessage(sender, target.getAllowFlight() ? "Enabled fly" : "Disabled fly");
 								return true;
@@ -506,7 +579,20 @@ public class RedfixPlugin extends JavaPlugin {
 			builder = builder.permission("redfix.command.gamemode").argument(gmArgument, "gamemode")
 					.argument(PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player target;
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (sender instanceof Player p)
+							target = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(target.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.gamemode.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.gamemode.others");
+							return false;
+						}
 						GameMode gameMode = values.get(commandContext.get("gamemode"));
 						if (gameMode == null) {
 							sendMessage(sender, "Please use a valid gamemode");
@@ -528,7 +614,20 @@ public class RedfixPlugin extends JavaPlugin {
 					.argument(IntegerArgument.of("time").optional(), "Time, if none given resets")
 					.argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player player = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player player;
+						if (commandContext.hasArgument("player"))
+							player = commandContext.get("player");
+						else if (sender instanceof Player p)
+							player = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(player.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.ptime.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.ptime.others");
+							return false;
+						}
 						if (commandContext.contains("time")) {
 							int time = commandContext.get("time");
 							player.setPlayerTime(time, commandContext.getFlag("relative"));
@@ -546,7 +645,7 @@ public class RedfixPlugin extends JavaPlugin {
 		//Weather
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("weather");
-			builder = builder.permission("redfix.command.pweather").argument(
+			builder = builder.permission("redfix.command.weather").argument(
 							EnumArgument.of("weather", WeatherType.class).parser((c, a) -> WeatherType.getByName(a))
 									.tabComplete((c, a) -> WeatherType.getAllNames().stream()
 											.filter(s -> s.startsWith(a.toLowerCase())).toList()), "Weather type")
@@ -570,15 +669,28 @@ public class RedfixPlugin extends JavaPlugin {
 							"Weather type, if none given resets").argument(PlayerArgument.of("player").optional())
 					.handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
-						Player player = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
+						Player player;
+						if (commandContext.hasArgument("player"))
+							player = commandContext.get("player");
+						else if (sender instanceof Player p)
+							player = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(player.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.pweather.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.pweather.others");
+							return false;
+						}
 						if (commandContext.contains("weather")) {
 							PlayerWeatherType type = commandContext.getArgument("weather");
 							player.setPlayerWeather(type.getBase());
-							sendMessage(player, "Set player weather");
+							sendMessage(sender, "Set player weather");
 						}
 						else {
 							player.resetPlayerWeather();
-							sendMessage(player, "Reset player weather");
+							sendMessage(sender, "Reset player weather");
 						}
 						return true;
 					});
@@ -713,12 +825,25 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Wspeed
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("walkspeed", "wspeed");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("walkspeed", "wspeed");
 			builder =
 					builder.permission("redfix.command.walkspeed").argument(FloatArgument.of("speed"), "Walking speed")
 							.argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
-								Player player = commandContext.getOrDefault("player", sender);
+								CommandSender sender = commandContext.getSender();
+								Player player;
+								if (commandContext.hasArgument("player"))
+									player = commandContext.get("player");
+								else if (sender instanceof Player p)
+									player = p;
+								else {
+									sendMessage(sender, "&4Please provide a player");
+									return false;
+								}
+								if (sender instanceof Player psender && !psender.getUniqueId().equals(player.getUniqueId()) &&
+										!psender.hasPermission("redfix.command.walkspeed.others")) {
+									CommandUtils.printMissingPermission(sender, "redfix.command.walkspeed.others");
+									return false;
+								}
 								float speed = commandContext.get("speed");
 								AttributeInstance attributeInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
 								attributeInstance.getModifiers().stream().filter(am -> am.getName().contentEquals("redfix"))
@@ -734,12 +859,25 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Fspeed
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("flyspeed", "fspeed");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("flyspeed", "fspeed");
 			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
 			builder = builder.permission("redfix.command.flyspeed").argument(speedArg, "Flying speed")
 					.argument(PlayerArgument.of("optional").optional()).handler(commandContext -> {
-						Player sender = (Player) commandContext.getSender();
-						Player player = commandContext.getOrDefault("player", sender);
+						CommandSender sender = commandContext.getSender();
+						Player player;
+						if (commandContext.hasArgument("player"))
+							player = commandContext.get("player");
+						else if (sender instanceof Player p)
+							player = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(player.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.flyspeed.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.flyspeed.others");
+							return false;
+						}
 						float speed = commandContext.get("speed");
 						player.setFlySpeed(speed / 10);
 						sendMessage(player, "Set fly speed to " + speed);
@@ -750,12 +888,25 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Speed
 		{
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("speed");
+			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("speed");
 			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
 			builder = builder.permission("redfix.command.speed").argument(speedArg, "Speed")
 					.argument(PlayerArgument.of("optional").optional()).handler(commandContext -> {
-						Player sender = (Player) commandContext.getSender();
-						Player player = commandContext.getOrDefault("player", sender);
+						CommandSender sender = commandContext.getSender();
+						Player player;
+						if (commandContext.hasArgument("player"))
+							player = commandContext.get("player");
+						else if (sender instanceof Player p)
+							player = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(player.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.speed.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.speed.others");
+							return false;
+						}
 						float speed = commandContext.get("speed");
 						if (player.isFlying()) {
 							player.setFlySpeed(speed / 10);
@@ -835,7 +986,8 @@ public class RedfixPlugin extends JavaPlugin {
 										"Enchanted " + item.getType() + " with " + enchantment + " : " + level);
 							else
 								sendMessage(player, "Removed " + enchantment + " from " + item.getType());
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					});
@@ -856,7 +1008,8 @@ public class RedfixPlugin extends JavaPlugin {
 						player.getInventory().addItem(new ItemStack(material, material.getMaxStackSize()));
 					}
 					player.getInventory().addItem(new ItemStack(material, count % material.getMaxStackSize()));
-				} catch (Exception e) {
+				}
+				catch (Exception e) {
 					e.printStackTrace();
 				}
 				return true;
@@ -871,10 +1024,17 @@ public class RedfixPlugin extends JavaPlugin {
 					.argument(OfflinePlayerArgument.of("player").optional()).handler(commandContext -> {
 						CommandSender sender = commandContext.getSender();
 						OfflinePlayer target;
-						try {
-							target = commandContext.getOrSupplyDefault("player", () -> (Player) sender);
-						} catch (ClassCastException e) {
-							sendMessage(sender, "You are not a player");
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (sender instanceof Player p)
+							target = p;
+						else {
+							sendMessage(sender, "&4Please provide a player");
+							return false;
+						}
+						if (sender instanceof Player psender && !psender.getUniqueId().equals(target.getUniqueId()) &&
+								!psender.hasPermission("redfix.command.playtime.others")) {
+							CommandUtils.printMissingPermission(sender, "redfix.command.playtime.others");
 							return false;
 						}
 						int playedTicks = target.getStatistic(Statistic.PLAY_ONE_MINUTE);
@@ -932,7 +1092,8 @@ public class RedfixPlugin extends JavaPlugin {
 										player.getInventory().setItem(i, item);
 									}
 								}
-							} catch (Exception ignored) {
+							}
+							catch (Exception ignored) {
 							}
 							sendMessage(player, "Repaired all");
 						}
@@ -978,7 +1139,8 @@ public class RedfixPlugin extends JavaPlugin {
 									}
 								}
 								sendMessage(player, "Repaired " + item.getType());
-							} catch (Exception ignored) {
+							}
+							catch (Exception ignored) {
 							}
 						}
 						return true;
@@ -989,30 +1151,32 @@ public class RedfixPlugin extends JavaPlugin {
 		//Unbreakable
 		{
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("unbreakable");
-			builder = builder.permission("redfix.command.unbreakable").handler(commandContext -> {
-				Player player = (Player) commandContext.getSender();
-				try {
-					ItemStack item = player.getInventory().getItemInMainHand();
-					if (item.getType() == Material.AIR)
-						item = player.getInventory().getItemInOffHand();
-					if (item.getType() == Material.AIR) {
-						sendMessage(player, "You are not holding any item");
-						return false;
-					}
-					ItemMeta meta = item.getItemMeta();
-					meta.setUnbreakable(true);
-					item.setItemMeta(meta);
-					if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
-						player.getInventory().setItemInMainHand(item);
-					}
-					else {
-						player.getInventory().setItemInOffHand(item);
-					}
-					sendMessage(player, "Made " + item.getType() + " unbreakable");
-				} catch (Exception ignored) {
-				}
-				return true;
-			});
+			builder = builder.permission("redfix.command.unbreakable").argument(BooleanArgument.optional("flag", true))
+					.handler(commandContext -> {
+						Player player = (Player) commandContext.getSender();
+						try {
+							ItemStack item = player.getInventory().getItemInMainHand();
+							if (item.getType() == Material.AIR)
+								item = player.getInventory().getItemInOffHand();
+							if (item.getType() == Material.AIR) {
+								sendMessage(player, "You are not holding any item");
+								return false;
+							}
+							ItemMeta meta = item.getItemMeta();
+							meta.setUnbreakable(commandContext.get("flag"));
+							item.setItemMeta(meta);
+							if (player.getInventory().getItemInMainHand().getType() != Material.AIR) {
+								player.getInventory().setItemInMainHand(item);
+							}
+							else {
+								player.getInventory().setItemInOffHand(item);
+							}
+							sendMessage(player, "Made " + item.getType() + " unbreakable");
+						}
+						catch (Exception ignored) {
+						}
+						return true;
+					});
 			commandManager.register(builder);
 		}
 		
@@ -1049,7 +1213,8 @@ public class RedfixPlugin extends JavaPlugin {
 								player.getInventory().setItemInOffHand(item);
 							}
 							sendMessage(player, "Added lore to " + item.getType());
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					});
@@ -1087,7 +1252,8 @@ public class RedfixPlugin extends JavaPlugin {
 								player.getInventory().setItemInOffHand(item);
 							}
 							sendMessage(player, "Added lore to " + item.getType());
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					});
@@ -1267,9 +1433,9 @@ public class RedfixPlugin extends JavaPlugin {
 				List<? extends Player> players = Bukkit.getOnlinePlayers().stream().toList();
 				for (String groupName : vaultChat.getGroups()) {
 					List<String> pl = players.stream().filter(p -> {
-								if (commandContext.getSender() instanceof ConsoleCommandSender)
-									return true;
-								return canSee((Player) commandContext.getSender(), p);
+								if (commandContext.getSender() instanceof Player psender)
+									return canSee(psender, p);
+								return true;
 							}).filter(p -> vaultChat.getPrimaryGroup(p).contentEquals(groupName))
 							.map(p -> (Afk.isAfk(p.getUniqueId()) ? "§7[AFK] §f" : "§f") +
 									(isVanished(p) ? "§7§o[Vanished] §f" : "§f") + vaultChat.getPlayerPrefix(p) +
@@ -1337,7 +1503,8 @@ public class RedfixPlugin extends JavaPlugin {
 														(Math.random() * 2 - 1) * dz), type);
 								}
 							});
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					});
@@ -1381,7 +1548,8 @@ public class RedfixPlugin extends JavaPlugin {
 								else
 									player.getWorld().strikeLightning(loc);
 							}
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					});
@@ -1415,7 +1583,8 @@ public class RedfixPlugin extends JavaPlugin {
 							}
 							else
 								sendMessage(player, "You are not looking at any block");
-						} catch (Exception ignored) {
+						}
+						catch (Exception ignored) {
 						}
 						return true;
 					}));
@@ -1435,7 +1604,8 @@ public class RedfixPlugin extends JavaPlugin {
 					}
 					else
 						sendMessage(player, "You are not looking at any block");
-				} catch (Exception ignored) {
+				}
+				catch (Exception ignored) {
 				}
 				return true;
 			}));
@@ -1493,7 +1663,8 @@ public class RedfixPlugin extends JavaPlugin {
 							int level = commandContext.get("level");
 							Bukkit.getScheduler().runTask(RedfixPlugin.getInstance(),
 									() -> player.addPotionEffect(new PotionEffect(effectType, duration * 20, level)));
-						} catch (Exception e) {
+						}
+						catch (Exception e) {
 							e.printStackTrace();
 						}
 						return true;
@@ -1517,7 +1688,8 @@ public class RedfixPlugin extends JavaPlugin {
 							Bukkit.getScheduler().runTask(this,
 									() -> CustomPotionEffectAPI.addEffect(player, effectType, duration * 20, level,
 											particles, false));
-						} catch (Exception e) {
+						}
+						catch (Exception e) {
 							e.printStackTrace();
 						}
 						return true;
@@ -1547,7 +1719,8 @@ public class RedfixPlugin extends JavaPlugin {
 							else {
 								sendMessage(player, "§4You are not holding a potion-bottle");
 							}
-						} catch (Exception e) {
+						}
+						catch (Exception e) {
 							e.printStackTrace();
 						}
 						return true;
@@ -1619,7 +1792,8 @@ public class RedfixPlugin extends JavaPlugin {
 									try {
 										EquipmentSlot slot = EquipmentSlot.valueOf(slotString);
 										modifier = new AttributeModifier(UUID.randomUUID(), "", amount, operation, slot);
-									} catch (IllegalArgumentException ignore) {
+									}
+									catch (IllegalArgumentException ignore) {
 										modifier = new AttributeModifier("", amount, operation);
 									}
 									
@@ -1642,7 +1816,8 @@ public class RedfixPlugin extends JavaPlugin {
 										player.getInventory().setItemInMainHand(item);
 									}
 									sendMessage(player, "Added attribute modifier " + modifier + " to " + item.getType());
-								} catch (Exception ignore) {
+								}
+								catch (Exception ignore) {
 								}
 								return true;
 							});
@@ -1679,7 +1854,8 @@ public class RedfixPlugin extends JavaPlugin {
 							sendMessage(player,
 									"Removed attribute modifier " + entry.getValue() + " (" + entry.getKey() +
 											") from " + item.getType());
-						} catch (Exception ignore) {
+						}
+						catch (Exception ignore) {
 						}
 						return true;
 					});
@@ -1690,17 +1866,27 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Bal
 		if (isEconomyEnabled()) {
-			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("balance", "bal", "money");
+			FrameworkCommand.Builder<CommandSender> builder =
+					FrameworkCommand.commandBuilder("balance", "bal", "money");
 			builder = builder.permission("redfix.command.balance")
 					.argument(OfflinePlayerArgument.of("player").optional(), "player").handler(commandContext -> {
-						Player player = (Player) commandContext.getSender();
-						OfflinePlayer target = commandContext.getOrDefault("player", player);
-						if (!player.getUniqueId().equals(target.getUniqueId()) &&
-								!player.hasPermission("redfix.command.bal.others")) {
-							CommandUtils.printMissingPermission(player, "redfix.command.bal.others");
+						OfflinePlayer target;
+						if (commandContext.hasArgument("player"))
+							target = commandContext.get("player");
+						else if (commandContext.getSender() instanceof Player p)
+							target = p;
+						else {
+							sendMessage(commandContext.getSender(), "&4Please provide a player");
 							return false;
 						}
-						sendMessage(player, "§aBalance of " + target.getName() + ": " +
+						if (commandContext.getSender() instanceof Player p &&
+								!p.getUniqueId().equals(target.getUniqueId()) &&
+								!p.hasPermission("redfix.command.bal.others")) {
+							CommandUtils.printMissingPermission(commandContext.getSender(),
+									"redfix.command.bal.others");
+							return false;
+						}
+						sendMessage(commandContext.getSender(), "§aBalance of " + target.getName() + ": " +
 								EconomyManager.getMoney(target.getUniqueId()) +
 								getConfig().getString("economy.symbol", "$"));
 						return true;
@@ -1735,7 +1921,7 @@ public class RedfixPlugin extends JavaPlugin {
 					topBuilder.subCommand("set").permission("redfix.command.economy.set")
 							.argument(OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount"))
 							.handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
+								CommandSender sender = commandContext.getSender();
 								OfflinePlayer player = commandContext.get("player");
 								double amount = commandContext.get("amount");
 								EconomyManager.setMoney(player.getUniqueId(), amount);
@@ -1748,7 +1934,7 @@ public class RedfixPlugin extends JavaPlugin {
 					topBuilder.subCommand("give").permission("redfix.command.economy.give")
 							.argument(OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount"))
 							.handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
+								CommandSender sender = commandContext.getSender();
 								OfflinePlayer player = commandContext.get("player");
 								double amount = commandContext.get("amount");
 								EconomyManager.addMoney(player.getUniqueId(), amount);
@@ -1761,7 +1947,7 @@ public class RedfixPlugin extends JavaPlugin {
 					topBuilder.subCommand("take").permission("redfix.command.economy.take")
 							.argument(OfflinePlayerArgument.of("player")).argument(DoubleArgument.of("amount"))
 							.handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
+								CommandSender sender = commandContext.getSender();
 								OfflinePlayer player = commandContext.get("player");
 								double amount = commandContext.get("amount");
 								EconomyManager.addMoney(player.getUniqueId(), -amount);
@@ -1773,7 +1959,7 @@ public class RedfixPlugin extends JavaPlugin {
 			FrameworkCommand.Builder<CommandSender> resetBuilder =
 					topBuilder.subCommand("reset").permission("redfix.command.economy.reset")
 							.argument(OfflinePlayerArgument.of("player")).handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
+								CommandSender sender = commandContext.getSender();
 								OfflinePlayer player = commandContext.get("player");
 								EconomyManager.setMoney(player.getUniqueId(), getConfig().getDouble("economy.startMoney", 100));
 								sendMessage(sender, "Reset player's " + player.getName() + " money");
@@ -1839,13 +2025,20 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		//Tp
 		{
-			FrameworkCommand.Builder<Player> builder =
-					FrameworkCommand.playerCommandBuilder("tp").permission("redfix.command.tp.toplayer")
+			FrameworkCommand.Builder<CommandSender> builder =
+					FrameworkCommand.commandBuilder("tp").permission("redfix.command.tp.toplayer")
 							.argument(PlayerArgument.of("player")).argument(PlayerArgument.of("target").optional())
 							.handler(commandContext -> {
-								Player sender = (Player) commandContext.getSender();
+								Player target;
+								if (commandContext.hasArgument("player"))
+									target = commandContext.get("player");
+								else if (commandContext.getSender() instanceof Player p)
+									target = p;
+								else {
+									sendMessage(commandContext.getSender(), "&4Please provide a target");
+									return false;
+								}
 								Player player = commandContext.get("player");
-								Player target = commandContext.getOrDefault("target", sender);
 								addToHistory(target);
 								Bukkit.getScheduler().runTask(this, () -> target.teleport(player));
 								return true;
@@ -2829,7 +3022,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2838,7 +3032,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileInputStream fis = new FileInputStream(file);
 			array = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonArray();
 			fis.close();
-		} catch (IOException | IllegalStateException e) {
+		}
+		catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
@@ -2847,7 +3042,8 @@ public class RedfixPlugin extends JavaPlugin {
 				Home home = Home.load(element.getAsJsonObject());
 				addHome(home);
 			}
-		} catch (Exception ignored) {
+		}
+		catch (Exception ignored) {
 		}
 	}
 	
@@ -2857,7 +3053,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2867,7 +3064,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileOutputStream fos = new FileOutputStream(file);
 			fos.write(gson.toJson(array).getBytes());
 			fos.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -2878,7 +3076,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2887,7 +3086,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileInputStream fis = new FileInputStream(file);
 			array = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonArray();
 			fis.close();
-		} catch (IOException | IllegalStateException e) {
+		}
+		catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
@@ -2896,7 +3096,8 @@ public class RedfixPlugin extends JavaPlugin {
 				Warp warp = Warp.load(element.getAsJsonObject());
 				addWarp(warp);
 			}
-		} catch (Exception ignored) {
+		}
+		catch (Exception ignored) {
 		}
 	}
 	
@@ -2906,7 +3107,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2916,7 +3118,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileOutputStream fos = new FileOutputStream(file);
 			fos.write(gson.toJson(array).getBytes());
 			fos.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -2927,7 +3130,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2936,7 +3140,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileInputStream fis = new FileInputStream(file);
 			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
 			fis.close();
-		} catch (IOException | IllegalStateException e) {
+		}
+		catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
@@ -2950,7 +3155,8 @@ public class RedfixPlugin extends JavaPlugin {
 						.toArray(Boolean[]::new);
 				God.players.put(UUID.fromString(key), bs);
 			}
-		} catch (Exception ignored) {
+		}
+		catch (Exception ignored) {
 		}
 	}
 	
@@ -2960,7 +3166,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2975,7 +3182,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileOutputStream fos = new FileOutputStream(file);
 			fos.write(gson.toJson(object).getBytes());
 			fos.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -2986,7 +3194,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -2995,7 +3204,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileInputStream fis = new FileInputStream(file);
 			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
 			fis.close();
-		} catch (IOException | IllegalStateException e) {
+		}
+		catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
@@ -3007,7 +3217,8 @@ public class RedfixPlugin extends JavaPlugin {
 								o.getAsJsonObject().get("x").getAsDouble(), o.getAsJsonObject().get("y").getAsDouble(),
 								o.getAsJsonObject().get("z").getAsDouble())));
 			}
-		} catch (Exception ignored) {
+		}
+		catch (Exception ignored) {
 		}
 	}
 	
@@ -3017,7 +3228,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -3034,7 +3246,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileOutputStream fos = new FileOutputStream(file);
 			fos.write(gson.toJson(object).getBytes());
 			fos.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -3045,7 +3258,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -3054,7 +3268,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileInputStream fis = new FileInputStream(file);
 			object = JsonParser.parseString(new String(fis.readAllBytes())).getAsJsonObject();
 			fis.close();
-		} catch (IOException | IllegalStateException e) {
+		}
+		catch (IOException | IllegalStateException e) {
 			e.printStackTrace();
 			return;
 		}
@@ -3065,7 +3280,8 @@ public class RedfixPlugin extends JavaPlugin {
 						new Location(Bukkit.getWorld(UUID.fromString(o.get("world").getAsString())),
 								o.get("x").getAsDouble(), o.get("y").getAsDouble(), o.get("z").getAsDouble()));
 			}
-		} catch (Exception ignored) {
+		}
+		catch (Exception ignored) {
 		}
 	}
 	
@@ -3075,7 +3291,8 @@ public class RedfixPlugin extends JavaPlugin {
 			try {
 				file.createNewFile();
 				return;
-			} catch (IOException e) {
+			}
+			catch (IOException e) {
 				e.printStackTrace();
 				return;
 			}
@@ -3096,7 +3313,8 @@ public class RedfixPlugin extends JavaPlugin {
 			FileOutputStream fos = new FileOutputStream(file);
 			fos.write(gson.toJson(object).getBytes());
 			fos.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
