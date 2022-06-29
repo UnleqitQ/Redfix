@@ -53,11 +53,6 @@ public class AbilityFixer implements PacketListener {
 		byte flags = buf.readByte();
 		float flySpeed = buf.readFloat();
 		float fovMod = buf.readFloat();
-		{
-			String s = Integer.toBinaryString(flags & 0b1111);
-			s = "0".repeat(4 - s.length()) + s;
-			System.out.printf("%s %.02f %.02f\n", s, flySpeed, fovMod);
-		}
 	}
 	
 	protected Object writeAbilities(boolean invulnerable, boolean isFlying, boolean canFly, boolean instabuild,
