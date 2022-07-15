@@ -1909,8 +1909,7 @@ public class RedfixPlugin extends JavaPlugin {
 							return false;
 						}
 						sendMessage(commandContext.getSender(), "§aBalance of " + target.getName() + ": " +
-								EconomyManager.getMoney(target.getUniqueId()) +
-								getConfig().getString("economy.symbol", "$"));
+								vaultEconomy.format(EconomyManager.getMoney(target.getUniqueId())));
 						return true;
 					});
 			commandManager.register(builder);
