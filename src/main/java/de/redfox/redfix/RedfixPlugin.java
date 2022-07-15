@@ -263,7 +263,7 @@ public class RedfixPlugin extends JavaPlugin {
 		loadDeathLocations(new File(saveDataFolder, "deathLocations.json"));
 		loadGod(new File(saveDataFolder, "god.json"));
 		loadLocationHistory(new File(saveDataFolder, "locationHistory.json"));
-		WorthCalculator.load(new File(saveDataFolder, "worth.yml"));
+		WorthCalculator.load(new File(pluginPath, "worth.yml"));
 		JailHandler.loadJails(new File(saveDataFolder, "jails.json"));
 		JailHandler.loadJailedPlayers(new File(saveDataFolder, "jailedPlayers.json"));
 	}
