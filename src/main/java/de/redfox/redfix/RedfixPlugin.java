@@ -255,7 +255,7 @@ public class RedfixPlugin extends JavaPlugin {
 		JailHandler.saveJailedPlayers(new File(saveDataFolder, "jailedPlayers.json"));
 	}
 	
-	public static void loadAll() s{
+	public static void loadAll() {
 		if (isEconomyEnabled())
 			EconomyManager.loadData(new File(saveDataFolder, "economy.json"));
 		loadHomes(new File(saveDataFolder, "homes.json"));
