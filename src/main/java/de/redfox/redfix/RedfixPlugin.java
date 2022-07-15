@@ -2053,7 +2053,7 @@ public class RedfixPlugin extends JavaPlugin {
 							.argument(PlayerArgument.of("player")).argument(PlayerArgument.of("target").optional())
 							.handler(commandContext -> {
 								Player target;
-								if (commandContext.hasArgument("player"))
+								if (commandContext.hasArgument("target"))
 									target = commandContext.get("target");
 								else if (commandContext.getSender() instanceof Player p)
 									target = p;
