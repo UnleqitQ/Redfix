@@ -186,12 +186,7 @@ public class WorthCalculator {
 	
 	public static void load(File file) {
 		file.getParentFile().mkdirs();
-		try {
-			file.createNewFile();
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
+		if (!file.exists()) return;
 		try {
 			YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 			Set<String> keys = config.getKeys(false);

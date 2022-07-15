@@ -1,6 +1,7 @@
 package de.redfox.redfix;
 
 import com.comphenix.protocol.ProtocolLibrary;
+import com.google.common.base.Charsets;
 import com.google.gson.*;
 import de.myzelyam.api.vanish.VanishAPI;
 import de.redfox.redfix.chat.ChatListener;
@@ -46,6 +47,8 @@ import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.event.inventory.InventoryType;
@@ -101,6 +104,8 @@ public class RedfixPlugin extends JavaPlugin {
 	public static Map<UUID, Map<String, Home>> homes = new HashMap<>();
 	public static Map<String, Warp> warps = new HashMap<>();
 	
+	public FileConfiguration commandsConfig;
+	
 	public static RfSql sql = null;
 	
 	private static ChestManager chestManager;
@@ -139,6 +144,22 @@ public class RedfixPlugin extends JavaPlugin {
 		
 		saveDefaultConfig();
 		reloadConfig();
+		{
+			File commandsConfigFile = new File(getDataFolder(), "commands.yml");
+			if (!commandsConfigFile.exists()) {
+				saveResource("commands.yml", false);
+			}
+			
+			commandsConfig = YamlConfiguration.loadConfiguration(commandsConfigFile);
+			
+			final InputStream defConfigStream = getResource("config.yml");
+			if (defConfigStream == null) {
+				return;
+			}
+			
+			commandsConfig.setDefaults(
+					YamlConfiguration.loadConfiguration(new InputStreamReader(defConfigStream, Charsets.UTF_8)));
+		}
 		
 		commandManager = new CommandManager(this);
 		
@@ -167,7 +188,7 @@ public class RedfixPlugin extends JavaPlugin {
 		commandSpy.load();
 		if (isEconomyEnabled()) {
 			vaultEconomy = new VaultEconomy();
-			getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.Highest);
+			getServer().getServicesManager().register(Economy.class, vaultEconomy, this, ServicePriority.High);
 			mainEconomy = vaultEconomy;
 		}
 		else {
@@ -234,7 +255,7 @@ public class RedfixPlugin extends JavaPlugin {
 		JailHandler.saveJailedPlayers(new File(saveDataFolder, "jailedPlayers.json"));
 	}
 	
-	public static void loadAll() {
+	public static void loadAll() s{
 		if (isEconomyEnabled())
 			EconomyManager.loadData(new File(saveDataFolder, "economy.json"));
 		loadHomes(new File(saveDataFolder, "homes.json"));
@@ -274,7 +295,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Jail
-		{
+		if (commandsConfig.getBoolean("jail", true)) {
 			FrameworkCommand.Builder<CommandSender> topBuilder = FrameworkCommand.commandBuilder("jail");
 			/*Command.Builder<CommandSender> createBuilder = topBuilder.literal("create").senderType(
 					Player.class).argument(PlayerArgument.of("player")).handler(commandContext -> {
@@ -370,7 +391,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//God
-		{
+		if (commandsConfig.getBoolean("god", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("god");
 			builder = builder.permission("redfix.command.god")
 					.flag(FrameworkFlag.of("silent").setDescription("You get damage but the amount is set to zero"))
@@ -409,7 +430,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Freeze
-		{
+		if (commandsConfig.getBoolean("freeze", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("freeze");
 			builder = builder.permission("redfix.command.freeze").argument(PlayerArgument.of("player"), "player")
 					//.argument(PlayerArgument.of("player"))
@@ -430,7 +451,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//InstaBreak
-		{
+		if (commandsConfig.getBoolean("instabreak", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("instabreak");
 			builder = builder.permission("redfix.command.instabreak")
 					.flag(FrameworkFlag.of("silk").setDescription("The block always drops as itself"))
@@ -456,7 +477,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Heal
-		{
+		if (commandsConfig.getBoolean("heal", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("heal");
 			builder = builder.permission("redfix.command.heal")
 					.flag(FrameworkFlag.of("particle").setDescription("Spawn a heart particle"))
@@ -491,7 +512,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Saturation
-		{
+		if (commandsConfig.getBoolean("saturation", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("saturation", "eat");
 			builder = builder.permission("redfix.command.saturation")
 					.argument(PlayerArgument.of("player").optional(), "player").handler(commandContext -> {
@@ -520,7 +541,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Fly
-		{
+		if (commandsConfig.getBoolean("fly", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("fly");
 			builder =
 					builder.permission("redfix.command.fly").argument(PlayerArgument.of("player").optional(), "player")
@@ -549,7 +570,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Gm
-		{
+		if (commandsConfig.getBoolean("gamemode", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("gamemode", "gm");
 			Map<String, GameMode> values = new HashMap<>();
 			values.put("0", GameMode.SURVIVAL);
@@ -608,7 +629,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//PTime
-		{
+		if (commandsConfig.getBoolean("ptime", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("ptime");
 			builder = builder.permission("redfix.command.ptime")
 					.flag(FrameworkFlag.of("relative").setDescription("makes the player time relative"))
@@ -644,7 +665,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Weather
-		{
+		if (commandsConfig.getBoolean("weather", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("weather");
 			builder = builder.permission("redfix.command.weather").argument(
 							EnumArgument.of("weather", WeatherType.class).parser((c, a) -> WeatherType.getByName(a))
@@ -661,7 +682,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//PWeather
-		{
+		if (commandsConfig.getBoolean("pweather", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("pweather");
 			builder = builder.permission("redfix.command.pweather").argument(
 							EnumArgument.of("weather", PlayerWeatherType.class).parser((c, a) -> PlayerWeatherType.getByName(a))
@@ -699,7 +720,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Time
-		{
+		if (commandsConfig.getBoolean("time", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("time", "rftime");
 			builder = builder.permission("redfix.command.time").argument(IntegerArgument.of("time"), "Time")
 					.handler(commandContext -> {
@@ -713,7 +734,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SetHome
-		{
+		if (commandsConfig.getBoolean("home", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("sethome");
 			builder = builder.permission("redfix.command.sethome").argument(StringArgument.of("name"), "Home name")
 					.handler(commandContext -> {
@@ -727,7 +748,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Home
-		{
+		if (commandsConfig.getBoolean("home", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("home");
 			builder = builder.permission("redfix.command.home")
 					.cooldown(getConfig().getInt("commands.home.cooldown", 10) * 20,
@@ -754,7 +775,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Homes
-		{
+		if (commandsConfig.getBoolean("home", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("homes");
 			builder = builder.permission("redfix.command.homes").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -772,7 +793,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SetWarp
-		{
+		if (commandsConfig.getBoolean("warp", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("setwarp");
 			builder = builder.permission("redfix.command.setwarp").argument(StringArgument.of("name"), "Warp name")
 					.handler(commandContext -> {
@@ -786,7 +807,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Warp
-		{
+		if (commandsConfig.getBoolean("warp", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warp");
 			builder = builder.permission("redfix.command.warp")
 					.cooldown(getConfig().getInt("commands.warp.cooldown", 10) * 20,
@@ -808,7 +829,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Warps
-		{
+		if (commandsConfig.getBoolean("warp", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("warps");
 			builder = builder.permission("redfix.command.warps").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -825,7 +846,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Wspeed
-		{
+		if (commandsConfig.getBoolean("wspeed", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("walkspeed", "wspeed");
 			builder =
 					builder.permission("redfix.command.walkspeed").argument(FloatArgument.of("speed"), "Walking speed")
@@ -859,7 +880,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Fspeed
-		{
+		if (commandsConfig.getBoolean("fspeed", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("flyspeed", "fspeed");
 			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
 			builder = builder.permission("redfix.command.flyspeed").argument(speedArg, "Flying speed")
@@ -888,7 +909,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Speed
-		{
+		if (commandsConfig.getBoolean("speed", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("speed");
 			FloatArgument.Builder speedArg = FloatArgument.of("speed").withMin(0).withMax(10);
 			builder = builder.permission("redfix.command.speed").argument(speedArg, "Speed")
@@ -928,7 +949,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Distance
-		{
+		if (commandsConfig.getBoolean("distance", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("distance");
 			builder = builder.permission("redfix.command.distance")
 					.argument(PlayerArgument.of("player"), "Player to measure distance to").handler(commandContext -> {
@@ -953,7 +974,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Enchant
-		{
+		if (commandsConfig.getBoolean("enchant", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("enchant", "rfenchant");
 			builder = builder.permission("redfix.command.enchant")
 					.argument(EnchantmentArgument.of("enchantment"), "The Enchantment to apply")
@@ -996,7 +1017,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Give
-		{
+		if (commandsConfig.getBoolean("give", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("i", "give", "item");
 			builder = builder.permission("redfix.command.give").argument(
 					MaterialArgument.of("material").tabComplete(new MaterialArgument.MaterialTabComplete(false, true)),
@@ -1019,7 +1040,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Playtime
-		{
+		if (commandsConfig.getBoolean("playtime", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("playtime");
 			builder = builder.permission("redfix.command.playtime")
 					.argument(OfflinePlayerArgument.of("player").optional()).handler(commandContext -> {
@@ -1050,7 +1071,7 @@ public class RedfixPlugin extends JavaPlugin {
 			commandManager.register(builder);
 		}
 		//PlaytimeTop
-		{
+		if (commandsConfig.getBoolean("playtime", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("playtimetop");
 			builder = builder.permission("redfix.command.playtimetop").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
@@ -1074,7 +1095,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Repair
-		{
+		if (commandsConfig.getBoolean("repair", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("repair");
 			builder = builder.permission("redfix.command.repair")
 					.flag(FrameworkFlag.of("all").setDescription("Repairs all your items")).handler(commandContext -> {
@@ -1150,7 +1171,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Unbreakable
-		{
+		if (commandsConfig.getBoolean("unbreakable", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("unbreakable");
 			builder = builder.permission("redfix.command.unbreakable").argument(BooleanArgument.optional("flag", true))
 					.handler(commandContext -> {
@@ -1182,7 +1203,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//AddLore
-		{
+		if (commandsConfig.getBoolean("addlore", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("addlore");
 			builder = builder.permission("redfix.command.addlore").argument(StringArrayArgument.of("lore"))
 					.handler(commandContext -> {
@@ -1223,7 +1244,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SetItemName
-		{
+		if (commandsConfig.getBoolean("setitemname", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("setitemname");
 			builder = builder.permission("redfix.command.setitemname").argument(StringArrayArgument.of("displayname"))
 					.handler(commandContext -> {
@@ -1262,7 +1283,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Craft
-		{
+		if (commandsConfig.getBoolean("craft", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("craft");
 			builder = builder.permission("redfix.command.craft").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1275,7 +1296,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Anvil
-		{
+		if (commandsConfig.getBoolean("anvil", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("anvil");
 			builder = builder.permission("redfix.command.anvil").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1288,7 +1309,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Grindstone
-		{
+		if (commandsConfig.getBoolean("grindstone", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("grindstone");
 			builder = builder.permission("redfix.command.grindstone").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1301,7 +1322,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Stonecutter
-		{
+		if (commandsConfig.getBoolean("stonecutter", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("stonecutter");
 			builder = builder.permission("redfix.command.stonecutter").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1314,7 +1335,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Loom
-		{
+		if (commandsConfig.getBoolean("loom", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("loom");
 			builder = builder.permission("redfix.command.loom").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1327,7 +1348,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Cartography
-		{
+		if (commandsConfig.getBoolean("cartography", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("cartography");
 			builder = builder.permission("redfix.command.cartography").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1340,7 +1361,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Smithing
-		{
+		if (commandsConfig.getBoolean("smithing", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("smithing");
 			builder = builder.permission("redfix.command.smithing").handler(commandContext -> {
 				Bukkit.getScheduler().runTask(this, () -> {
@@ -1353,7 +1374,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Ec
-		{
+		if (commandsConfig.getBoolean("ec", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("ec");
 			builder = builder.permission("redfix.command.ec").argument(PlayerArgument.of("target").optional())
 					.handler(commandContext -> {
@@ -1373,7 +1394,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Invsee
-		{
+		if (commandsConfig.getBoolean("invsee", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("invsee");
 			builder = builder.permission("redfix.command.invsee").argument(PlayerArgument.of("target"))
 					.handler(commandContext -> {
@@ -1388,7 +1409,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//BetaInvsee
-		{
+		if (commandsConfig.getBoolean("betainvsee", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("betainvsee");
 			builder = builder.permission("redfix.command.invsee").argument(PlayerArgument.of("target"))
 					.handler(commandContext -> {
@@ -1404,7 +1425,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Afk
-		{
+		if (commandsConfig.getBoolean("afk", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("afk");
 			builder = builder.permission("redfix.command.afk").argument(PlayerArgument.of("target").optional())
 					.handler(commandContext -> {
@@ -1427,7 +1448,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//List
-		{
+		if (commandsConfig.getBoolean("list", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("list", "ls");
 			builder = builder.permission("redfix.command.list").handler(commandContext -> {
 				CommandSender sender = commandContext.getSender();
@@ -1453,7 +1474,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SpawnMob
-		{
+		if (commandsConfig.getBoolean("spawnmob", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("spawnmob");
 			builder = builder.permission("redfix.command.spawnmob")
 					.argument(EntityTypeArgument.of("entity"), "The Entity to spawn")
@@ -1513,7 +1534,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Chunkinfo
-		{
+		if (commandsConfig.getBoolean("chunkinfo", true)) {
 			FrameworkCommand.Builder<Player> topBuilder =
 					FrameworkCommand.playerCommandBuilder("chunkinfo", "ci").permission("redfix.command.chunkinfo");
 			commandManager.register(
@@ -1530,7 +1551,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Smite
-		{
+		if (commandsConfig.getBoolean("smite", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("smite");
 			builder = builder.permission("redfix.command.smite")
 					.flag(FrameworkFlag.of("effect").setDescription("Only the animation without damage"))
@@ -1558,7 +1579,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Sign
-		{
+		if (commandsConfig.getBoolean("sign", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("sign").permission("redfix.command.sign");
 			commandManager.register(builder.subCommand("edit").argument(IntegerArgument.of("line"))
@@ -1613,7 +1634,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//ClearChat
-		{
+		if (commandsConfig.getBoolean("clearchat", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("clearchat");
 			builder = builder.permission("redfix.command.clearchat").handler(commandContext -> {
 				Component c = Component.text("\n".repeat(100))
@@ -1626,7 +1647,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//CommandSpy
-		{
+		if (commandsConfig.getBoolean("commandspy", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("commandspy");
 			builder = builder.permission("redfix.command.commandspy").handler(commandContext -> {
 				Player player = (Player) commandContext.getSender();
@@ -1652,7 +1673,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Effect
-		{
+		if (commandsConfig.getBoolean("effect", true)) {
 			FrameworkCommand.Builder<CommandSender> builder = FrameworkCommand.commandBuilder("effect");
 			builder = builder.permission("redfix.command.effect").argument(PlayerArgument.of("player"))
 					.argument(EffectArgument.of("effect")).argument(IntegerArgument.optional("duration", 30))
@@ -1699,7 +1720,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//ModPotion
-		{
+		if (commandsConfig.getBoolean("modifypotion", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("modifypotion");
 			builder = builder.permission("redfix.command.modifypotion").argument(EffectArgument.of("effect"))
 					.argument(IntegerArgument.optional("duration", 30)).argument(IntegerArgument.optional("level", 0))
@@ -1730,7 +1751,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Item Attribute
-		{
+		if (commandsConfig.getBoolean("itemattribute", true)) {
 			FrameworkCommand.Builder<CommandSender> topBuilder =
 					FrameworkCommand.commandBuilder("itemattribute").permission("redfix.command.itemattribute");
 			StringArgument.Builder attributeArgument =
@@ -2000,9 +2021,10 @@ public class RedfixPlugin extends JavaPlugin {
 								sendMessage(sender,
 										"§bPayed §a" + amount + getConfig().getString("economy.symbol", "$") + "§b to §6" +
 												player.getName());
-								sendMessage(sender,
-										"§bYou got §a" + amount + getConfig().getString("economy.symbol", "$") + "§b from §6" +
-												sender.getDisplayName());
+								if (player.isOnline())
+									sendMessage(player.getPlayer(),
+											"§bYou got §a" + amount + getConfig().getString("economy.symbol", "$") +
+													"§b from §6" + sender.getDisplayName());
 								saveEco();
 								return true;
 							});
@@ -2011,7 +2033,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Broadcast
-		{
+		if (commandsConfig.getBoolean("broadcast", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("broadcast", "bc").permission("redfix.command.broadcast")
 							.argument(StringArrayArgument.of("message")).handler(commandContext -> {
@@ -2025,14 +2047,14 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Tp
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("tp").permission("redfix.command.tp.toplayer")
 							.argument(PlayerArgument.of("player")).argument(PlayerArgument.of("target").optional())
 							.handler(commandContext -> {
 								Player target;
 								if (commandContext.hasArgument("player"))
-									target = commandContext.get("player");
+									target = commandContext.get("target");
 								else if (commandContext.getSender() instanceof Player p)
 									target = p;
 								else {
@@ -2048,7 +2070,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//TpHere
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("tphere").permission("redfix.command.tp.here")
 							.argument(PlayerArgument.of("target")).handler(commandContext -> {
@@ -2062,7 +2084,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//TpAll
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("tpall").permission("redfix.command.tp.all")
 							.argument(PlayerArgument.of("player").optional()).handler(commandContext -> {
@@ -2078,7 +2100,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//TpPos
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("tppos").permission("redfix.command.tp.pos").argument(
 									DoubleArgument.of("x").tabComplete((c, a) -> List.of(
@@ -2103,7 +2125,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Back
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("back").permission("redfix.command.tp.back")
 							.argument(PlayerArgument.of("target").optional()).handler(commandContext -> {
@@ -2121,7 +2143,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//DBack
-		{
+		if (commandsConfig.getBoolean("tp", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("dback").permission("redfix.command.tp.dback")
 							.argument(PlayerArgument.of("target").optional()).handler(commandContext -> {
@@ -2139,7 +2161,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Kick
-		{
+		if (commandsConfig.getBoolean("kick", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("kick").permission("redfix.command.kick")
 							.argument(PlayerArgument.of("player"))
@@ -2154,7 +2176,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Ban
-		{
+		if (commandsConfig.getBoolean("ban", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("ban").permission("redfix.command.ban")
 							.argument(OfflinePlayerArgument.of("player"))
@@ -2171,7 +2193,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//TempBan
-		{
+		if (commandsConfig.getBoolean("ban", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("tempban").permission("redfix.command.tempban")
 							.argument(OfflinePlayerArgument.of("player")).argument(IntegerArgument.of("duration"))
@@ -2191,7 +2213,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Mute
-		{
+		if (commandsConfig.getBoolean("mute", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("mute").permission("redfix.command.mute")
 							.argument(PlayerArgument.of("player")).handler(commandContext -> {
@@ -2203,7 +2225,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//TempMute
-		{
+		if (commandsConfig.getBoolean("mute", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("tempmute").permission("redfix.command.mute")
 							.argument(PlayerArgument.of("player")).argument(IntegerArgument.of("duration"))
@@ -2217,7 +2239,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//UnMute
-		{
+		if (commandsConfig.getBoolean("mute", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("unmute").permission("redfix.command.unmute")
 							.argument(PlayerArgument.of("player")).handler(commandContext -> {
@@ -2229,7 +2251,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Roll
-		{
+		if (commandsConfig.getBoolean("roll", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("roll").permission("redfix.command.roll")
 							.argument(IntegerArgument.optional("maxValue", 100)).handler(commandContext -> {
@@ -2241,7 +2263,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Nick
-		{
+		if (commandsConfig.getBoolean("nick", true)) {
 			FrameworkCommand.Builder<Player> topBuilder =
 					FrameworkCommand.playerCommandBuilder("nick").permission("redfix.command.nick");
 			commandManager.register(topBuilder.subCommand("set").argument(StringArgument.of("value")).handler(c -> {
@@ -2257,7 +2279,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Msg
-		{
+		if (commandsConfig.getBoolean("msg", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("msg").permission("redfix.command.msg")
 							.argument(PlayerArgument.of("player")).argument(StringArrayArgument.of("message"))
@@ -2296,7 +2318,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Respond
-		{
+		if (commandsConfig.getBoolean("msg", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("r").permission("redfix.command.msg")
 							.argument(StringArrayArgument.of("message")).handler(commandContext -> {
@@ -2346,7 +2368,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Me
-		{
+		if (commandsConfig.getBoolean("me", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("me", "action").permission("redfix.command.me")
 							.argument(StringArrayArgument.of("message")).handler(commandContext -> {
@@ -2381,12 +2403,14 @@ public class RedfixPlugin extends JavaPlugin {
 								double value = WorthCalculator.getWorth(material, new HashSet<>());
 								if (Double.isNaN(value))
 									sendMessage(commandContext.getSender(), "No Worth");
-								else
+								else {
 									sendMessage(commandContext.getSender(),
-											"Worth of " + material + " is §6" + vaultEconomy.format(value) +
-													"§f,\nbut you will only receive §6" + vaultEconomy.format(
-													value * (1 - getConfig().getDouble("economy.sellFee", 0.2))) +
-													"§f for selling");
+											"Worth of " + material.getKey().getKey() + " is §6" + vaultEconomy.format(value) +
+													"§f,");
+									sendMessage(commandContext.getSender(), "but you will only receive §6" +
+											vaultEconomy.format(value * (1 - getConfig().getDouble("economy.sellFee", 0.2))) +
+											"§f for selling");
+								}
 								return true;
 							});
 			
@@ -2525,7 +2549,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Colors
-		{
+		if (commandsConfig.getBoolean("colors", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("colors").permission("redfix.command.colors")
 							.handler(commandContext -> {
@@ -2559,7 +2583,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//KillAll
-		{
+		if (commandsConfig.getBoolean("killall", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("killall").permission("redfix.command.killall")
 							.flag(FrameworkFlag.of("kill").setDescription("Kill the Mobs instead of removing them"))
@@ -2669,7 +2693,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//KillNear
-		{
+		if (commandsConfig.getBoolean("killnear", true)) {
 			FrameworkCommand.Builder<Player> builder =
 					FrameworkCommand.playerCommandBuilder("killnear").permission("redfix.command.killall")
 							.argument(DoubleArgument.of("radius"))
@@ -2771,7 +2795,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//InvisibleItemFrame
-		{
+		if (commandsConfig.getBoolean("invitemframe", true)) {
 			FrameworkCommand.Builder<Player> builder = FrameworkCommand.playerCommandBuilder("invitemframe", "iif")
 					.permission("redfix.command.invitemframe").handler(commandContext -> {
 						Bukkit.getScheduler().runTask(this, () -> {
@@ -2799,7 +2823,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Sudo
-		{
+		if (commandsConfig.getBoolean("sudo", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("sudo").permission("redfix.command.sudo")
 							.argument(PlayerArgument.of("player")).argument(StringArrayArgument.of("command"))
@@ -2815,7 +2839,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//RSudo
-		{
+		if (commandsConfig.getBoolean("rsudo", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("rsudo").permission("redfix.command.rsudo")
 							.argument(PlayerArgument.of("player")).argument(StringArgument.of("command").tabComplete(
@@ -2841,7 +2865,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//PSudo
-		{
+		if (commandsConfig.getBoolean("psudo", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("psudo").permission("redfix.command.psudo")
 							.argument(PlayerArgument.of("player")).argument(StringArrayArgument.of("command"))
@@ -2859,7 +2883,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//SayAs
-		{
+		if (commandsConfig.getBoolean("sayas", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("sayas").permission("redfix.command.sayas")
 							.argument(PlayerArgument.of("player"))
@@ -2876,7 +2900,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Ip
-		{
+		if (commandsConfig.getBoolean("ip", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("ip").permission("redfix.command.ip")
 							.argument(PlayerArgument.of("player")).handler(commandContext -> {
@@ -2890,7 +2914,7 @@ public class RedfixPlugin extends JavaPlugin {
 		}
 		
 		//Ping
-		{
+		if (commandsConfig.getBoolean("ping", true)) {
 			FrameworkCommand.Builder<CommandSender> builder =
 					FrameworkCommand.commandBuilder("ping").permission("redfix.command.ping")
 							.argument(PlayerArgument.of("player").optional()).handler(commandContext -> {

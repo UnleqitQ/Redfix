@@ -3,6 +3,7 @@ version: '${project.version}'
 main: de.redfox.redfix.RedfixPlugin
 api-version: 1.17
 authors: [ Kevin, UnleqitQ ]
+load: STARTUP
 depend:
   - CommandFramework
   - ProtocolLib
